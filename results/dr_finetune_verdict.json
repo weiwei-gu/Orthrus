@@ -1,0 +1,41 @@
+{
+  "experiment": "域随机化精调链 sim2sim 转移判决 (2026-09-20, 链 15:29-17:39 全程 ~2h10m CPU)",
+  "dr_ranges": {
+    "friction": [0.6, 1.4], "mass": [0.85, 1.15],
+    "damping": [0.7, 1.3], "motor_kp_kd": [0.7, 1.3]
+  },
+  "stage2_walk_17_7M": {
+    "verdict": "PASS - DR 关闭了 sim2sim 行走漂移",
+    "snapshots_sim2sim_vx": {
+      "3.93M": -0.06, "5.9M": 0.04, "7.86M": null, "9.83M": 0.09,
+      "11.8M": 0.07, "13.76M": 0.17, "15.73M": 0.12, "17.7M_final": -0.04
+    },
+    "no_dr_baseline_vx": {"11.8M": 0.14, "13.8M": -0.14, "15.7M": -0.20, "17.7M_final": "FELL_roll176deg"},
+    "best_snapshot": "13.76M (+0.17 m/s, 项目最佳 RL 步行者)"
+  },
+  "stage3_push0.9_8.85M": {
+    "verdict": "FAIL - 9/9 检查点 MuJoCo 全部趴地 (z=0.081)",
+    "fall_signature": "倒在 3s 站立期内: t=1s roll 32°, t=2s roll 89°, t=3s roll 176°(仰面); MJX 侧评估奖励 950-1080 回合存活",
+    "no_dr_baseline": "最终策略同样趴地 (z=0.079, roll 176°)"
+  },
+  "stage4_push1.8_8.85M": {
+    "verdict": "FAIL - 全部检查点含最终策略 MuJoCo 趴地 (z=0.081, roll 178°)",
+    "mjx_eval_reward_final": 768, "mjx_episode_length_final": 666
+  },
+  "push_suite_dr_sweet_spot_13.76M": {
+    "trot": {"10Ns": "10/16", "20Ns": "4/16", "30Ns": "2/16"},
+    "walk": {"10Ns": "5/8", "20Ns": "2/8", "30Ns": "2/8"},
+    "total": "25/72 (35%)"
+  },
+  "final_conclusions": [
+    "1. DR 关闭物理参数过拟合型漂移 (s2 判决成立, 9 检查点全存活)",
+    "2. DR 未救住推力训练策略的转移死亡 (s3/s4 18 数据点全灭, 死法与无 DR 同签名) - 缺口在接触求解器层 (solref/solimp 未随机化), 超出物理参数 DR 覆盖",
+    "3. bc_init (60%) 卫冕救援脑, 混合 94% 不变",
+    "4. DR 链最优产物 = 13.76M 步行特化策略 (+0.17 m/s / 35% 套件)"
+  ],
+  "next_experiment_directions": [
+    "接触参数随机化 (solref/solimp 进 DR)",
+    "部署侧接触适配 (MuJoCo 参数对齐 MJX 训练分布)",
+    "推力训练加入 MuJoCo 验证回路 (快照准入门槛)"
+  ]
+}
