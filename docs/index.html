@@ -154,6 +154,12 @@
                                     12 × 位置伺服  τ = k_p(q*−q) − k_d·q̇
                                     （k_p=50, k_d=0.5, §1.4）</div>
 <p>三种控制器（MPC、RL、混合）输出统一到<b>同一执行器接口</b>，因此可以被同一套推力协议（§5）逐格对表。</p>
+<p style="margin-top:18px"><b>演示视频</b>（26 s，<code>record_video.py</code> 离屏渲染，剧本可复现）：
+行走 → 被踹<b>变橙红</b>（仲裁器交棒 RL 救援，§4）→ 回色（MPC 接回继续走）。
+三脚 18/20/22 N·s 全部救回，零摔倒，共 6 次换脑决策：</p>
+<video controls muted loop autoplay
+  style="width:100%; border-radius:10px; border:1px solid var(--line);"
+  src="demo.mp4"></video>
 
 <!-- ================================================================== -->
 <h2 id="s1"><span class="no">1</span>动力学模型构建</h2>

@@ -198,6 +198,10 @@
 
 <h2 id="s6"><span class="no">6</span>Orthrus：融合夺冠</h2>
 <p class="lead">至此三方各持一角：MPC 赢速度（0.5 m/s、跟踪 100%）、BC 赢抗扰（60%）、精调版两头不靠（51%）。把它们的长处拼起来的机会出现了——这就是 Orthrus（希腊神话的双头犬）：MPC 是理性脑，RL 是反射脑，仲裁器决定每个瞬间谁在开车。</p>
+<p><b>眼见为实</b>（26 s 离屏渲染实录，机身橙红 = RL 在救场，原色 = MPC 在开车）：</p>
+<video controls muted loop autoplay
+  style="width:100%; border-radius:10px; border:1px solid var(--line);"
+  src="demo.mp4"></video>
 <h3>设计要点（每个都有对应的失败教训）</h3>
 <ul>
   <li><b>接口统一</b>：RL 策略输出位置目标；MPC 的力矩经代数转换驱动同一组位置伺服：<code>q_des = q + (τ + kd·qd)/kp</code>——MPC 全栈一行不改</li>

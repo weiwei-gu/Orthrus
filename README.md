@@ -5,6 +5,8 @@
 📖 **技术设计文档**：[动力学模型、数学控制器设计与验证工作流](https://weiwei-gu.github.io/Orthrus/) —— 全部公式与常数和代码逐项一致（SRB 动力学、QP 形式化、MDP/奖励、仲裁状态机、72 试验协议）。
 📚 **开发叙事版**：[从零到 94% 的实录（story）](https://weiwei-gu.github.io/Orthrus/story.html) —— 10 天全过程长文，含全部踩坑记录。
 
+🎬 **演示视频**（26 s）：[Orthrus 混合控制器实录](docs/demo.mp4) —— MPC 行走 → 被踹**变橙红**（RL 脑接管救援）→ 变回原色继续走，三脚 18/20/22 N·s 全部救回，零摔倒。由 `record_video.py` 离屏渲染录制，可复现。
+
 Unitree Go2 四足机器人运动控制项目（MuJoCo 仿真，全程在一台 MacBook Pro 的 CPU 上完成）。
 从零实现了三种控制范式，用同一套 **72 试验推力恢复测试套件**正面对比，最终融合为双脑混合控制器：
 
@@ -64,6 +66,7 @@ control/
 ├── show_go2_mpc.py        演示：MPC 行走（交互窗口）
 ├── show_go2_rl.py         演示：RL 边走边挨踹 / 纯行走（镜头跟随）
 ├── show_go2_hybrid.py     演示：★ 混合控制器（机身变色 = 换脑）
+├── record_video.py        演示视频离屏渲染录制（→ docs/demo.mp4，可复现）
 ├── run_gentle_finetune.sh RL 精调链（采集 → BC → 三阶段 PPO）
 ├── policies/              核心策略 pkl（bc_init = RL 救援脑 60%；rl_walk_sweet_spot = 无DR甜点；
 │                         rl_walk_dr_fast = DR 最快步行者 13.76M/+0.17；bc_demos = 示范数据；
