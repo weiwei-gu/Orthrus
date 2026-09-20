@@ -43,6 +43,15 @@ Z_TARGET = 0.28
 Z_MIN, Z_MAX = 0.16, 0.45
 GRAVITY_DONE = 0.5       # 上方向量 z 分量 < 0.5 (倾斜 > 60°) 终止
 
+# ---- 物理域随机化 (相对标称的缩放, 每回合 reset 抽一次) ----
+# 关闭 sim2sim 漂移的关键: 上轮精调在 MJX 标称物理上越训越贴 MJX 细节,
+# 11.8M 之后 MuJoCo 迁移性单调退化 (s3/s4 全躺平)。物理参数一随机,
+# 策略必须对摩擦/质量/电机强度鲁棒, 无法再过拟合单一物理。
+DR_FRICTION = (0.6, 1.4)    # 滑动摩擦
+DR_MASS = (0.85, 1.15)      # 各连杆质量
+DR_DAMPING = (0.7, 1.3)     # 关节阻尼
+DR_MOTOR = (0.7, 1.3)       # 位置伺服增益 kp/kd (电机强度)
+
 DEFAULT_QPOS = jp.array([0.0, 0.0, 0.27, 1, 0, 0, 0] + [0.0, 0.9, -1.8] * 4)
 DEFAULT_JOINTS = DEFAULT_QPOS[7:19]
 
@@ -57,15 +66,52 @@ class Go2Env(PipelineEnv):
     """Go2 行走环境 (50 Hz 决策, 含速度冲量推力随机化)"""
 
     def __init__(self, push_max=PUSH_VEL_MAX, push_every=PUSH_EVERY,
-                 cmd_x=CMD_X, **kwargs):
+                 cmd_x=CMD_X, domain_rand=True, **kwargs):
         mj_model = mujoco.MjModel.from_xml_path(SCENE)
         sys = mjcf.load_model(mj_model)
         self._push_max = push_max
         self._push_every = push_every
         self._cmd_x = cmd_x
+        self._domain_rand = domain_rand
         kwargs.setdefault("n_frames", N_FRAMES)
         kwargs.setdefault("backend", "mjx")
         super().__init__(sys=sys, **kwargs)
+
+    # ------------------------------------------------------------------ #
+    def _dr_draw(self, rng):
+        """抽样本回合的物理域随机化系数 (关闭时全 1)"""
+        if not self._domain_rand:
+            return {"friction": jp.ones(()),
+                    "mass": jp.ones((self.sys.body_mass.shape[0],)),
+                    "damping": jp.ones((self.sys.dof_damping.shape[0],)),
+                    "motor": jp.ones(())}
+        return {
+            "friction": jax.random.uniform(rng, (), minval=DR_FRICTION[0], maxval=DR_FRICTION[1]),
+            "mass": jax.random.uniform(rng, (self.sys.body_mass.shape[0],),
+                                       minval=DR_MASS[0], maxval=DR_MASS[1]),
+            "damping": jax.random.uniform(rng, (self.sys.dof_damping.shape[0],),
+                                           minval=DR_DAMPING[0], maxval=DR_DAMPING[1]),
+            "motor": jax.random.uniform(rng, (), minval=DR_MOTOR[0], maxval=DR_MOTOR[1]),
+        }
+
+    def _dr_sys(self, dr):
+        """按本回合系数重建 System (brax System 是 flax PyTreeNode, replace 即得)"""
+        sys = self.sys
+        return sys.replace(
+            geom_friction=sys.geom_friction.at[:, 0].multiply(dr["friction"]),
+            body_mass=sys.body_mass * dr["mass"],
+            dof_damping=sys.dof_damping * dr["damping"],
+            # 位置伺服: gainprm[:,0]=kp, biasprm[:,1:3]=(-kp,-kd) —— 同乘电机强度
+            actuator_gainprm=sys.actuator_gainprm.at[:, 0].multiply(dr["motor"]),
+            actuator_biasprm=sys.actuator_biasprm.at[:, 1].multiply(dr["motor"])
+                                                   .at[:, 2].multiply(dr["motor"]),
+        )
+
+    def _pipeline_step_sys(self, sys, pipeline_state, action):
+        """带自定义 System 的物理推进 (复刻 PipelineEnv.pipeline_step 的 scan 结构)"""
+        def f(state, _):
+            return (self._pipeline.step(sys, state, action, self._debug), None)
+        return jax.lax.scan(f, pipeline_state, (), self._n_frames)[0]
 
     # ------------------------------------------------------------------ #
     def _obs(self, ps, cmd, prev_action, phase):
@@ -81,7 +127,7 @@ class Go2Env(PipelineEnv):
         return jp.concatenate([clock, grav, cmd, ps.qvel[3:6], q, qd, prev_action])
 
     def reset(self, rng):
-        rng, rng1, rng2, rng3 = jax.random.split(rng, 4)
+        rng, rng1, rng2, rng3, rng_dr = jax.random.split(rng, 5)
         qpos = DEFAULT_QPOS + jp.concatenate([
             jax.random.uniform(rng1, (2,), minval=-0.1, maxval=0.1),
             jax.random.uniform(rng2, (1,), minval=-0.01, maxval=0.05),
@@ -104,7 +150,8 @@ class Go2Env(PipelineEnv):
                                                 minval=self._push_every[0],
                                                 maxval=self._push_every[1]),
                 "cmd": cmd, "prev_action": jp.zeros(12),
-                "phase": jax.random.uniform(rng3, ())}   # 时钟随机初相
+                "phase": jax.random.uniform(rng3, ()),   # 时钟随机初相
+                "dr": self._dr_draw(rng_dr)}              # 本回合物理域系数
         obs = self._obs(ps, cmd, jp.zeros(12), info["phase"])
         reward, done = jp.zeros(2)
         # metrics 键必须在 reset 声明且与 step 完全一致:
@@ -132,7 +179,11 @@ class Go2Env(PipelineEnv):
             state.info["next_push"])
 
         ctrl = DEFAULT_JOINTS + ACTION_SCALE * action
-        ps = self.pipeline_step(ps0, ctrl)
+        # 物理域随机化: 用本回合抽样的 System 推进 (静态分支, 关闭时走原路径)
+        if self._domain_rand:
+            ps = self._pipeline_step_sys(self._dr_sys(state.info["dr"]), ps0, ctrl)
+        else:
+            ps = self.pipeline_step(ps0, ctrl)
 
         cmd = state.info["cmd"]
         quat = ps.qpos[3:7]
@@ -227,7 +278,7 @@ def main():
 
     print(f"JAX 设备: {jax.devices()} | 阶段 {args.stage} "
           f"(push_max={cfg['push_max']}, cmd_x={cfg['cmd_x']}) | "
-          f"步数 {num_timesteps:,} | 并行环境 {num_envs}")
+          f"步数 {num_timesteps:,} | 并行环境 {num_envs} | 物理域随机化 开")
     env = Go2Env(push_max=cfg["push_max"], push_every=cfg["push_every"],
                  cmd_x=cfg["cmd_x"])
 

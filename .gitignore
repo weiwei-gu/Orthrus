@@ -17,4 +17,4 @@ mujoco_menagerie/
 # 策略产物 (~34MB 本地实验工件): 只跟踪快速开始所需的两个
 policies/*.pkl
 !policies/bc_init.pkl
-!policies/rl_policy_snap_s2_11796480.pkl
+!policies/rl_walk_sweet_spot.pkl

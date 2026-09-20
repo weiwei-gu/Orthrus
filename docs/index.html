@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orthrus：一条狗，两个脑 —— 从零到 94% 的四足机器人控制实录</title>
+<meta name="description" content="在一台 MacBook 上从零实现四足机器人的三种控制范式（Convex MPC / 深度强化学习 / 混合仲裁），用同一套 72 试验推力测试套件量化对比，最终混合控制器以 94% 恢复率夺冠的完整实录。">
+<style>
+  :root {
+    --ink: #1a1f28; --ink2: #4a5468; --line: #e3e7ee; --bg: #ffffff;
+    --accent: #d9642a; --accent2: #2a6cd9; --code-bg: #f5f7fa; --table-head: #f0f3f8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    color: var(--ink); background: var(--bg); line-height: 1.75; font-size: 16px;
+  }
+  .wrap { max-width: 800px; margin: 0 auto; padding: 48px 22px 80px; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 36px; margin-bottom: 40px; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
+  h1 { font-size: 34px; line-height: 1.25; margin: 10px 0 14px; font-weight: 800; }
+  .sub { color: var(--ink2); font-size: 17px; }
+  .stats { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 26px; }
+  .stat { border: 1px solid var(--line); border-radius: 10px; padding: 12px 18px; min-width: 120px; }
+  .stat b { display: block; font-size: 24px; color: var(--accent); font-weight: 800; }
+  .stat span { color: var(--ink2); font-size: 13px; }
+  h2 { font-size: 24px; margin: 56px 0 16px; padding-top: 12px; font-weight: 800; }
+  h2 .no { color: var(--accent); margin-right: 8px; font-family: ui-monospace, monospace; }
+  h3 { font-size: 18px; margin: 28px 0 10px; }
+  p { margin: 12px 0; }
+  p.lead { font-size: 17px; color: var(--ink); }
+  ul, ol { padding-left: 24px; margin: 12px 0; }
+  li { margin: 6px 0; }
+  a { color: var(--accent2); text-decoration: none; border-bottom: 1px solid #c9d8f2; }
+  a:hover { border-bottom-color: var(--accent2); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em;
+    background: var(--code-bg); padding: 2px 6px; border-radius: 5px;
+  }
+  pre {
+    background: #10141c; color: #dbe4f0; padding: 18px 20px; border-radius: 10px;
+    overflow-x: auto; margin: 16px 0; font-size: 13.5px; line-height: 1.6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; }
+  th { background: var(--table-head); font-weight: 700; }
+  tr.hl td { background: #fdf3ec; font-weight: 700; }
+  .callout {
+    border-left: 4px solid var(--accent); background: #fdf6f1; padding: 14px 18px;
+    border-radius: 0 10px 10px 0; margin: 18px 0; color: #51392a;
+  }
+  .callout b { color: var(--accent); }
+  .ascii {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; font-family: ui-monospace, monospace;
+    font-size: 12.5px; line-height: 1.5; white-space: pre; margin: 16px 0;
+  }
+  footer { border-top: 1px solid var(--line); margin-top: 64px; padding-top: 24px; color: var(--ink2); font-size: 14px; }
+  .toc { border: 1px solid var(--line); border-radius: 10px; padding: 18px 26px; margin: 8px 0 40px; }
+  .toc b { display: block; margin-bottom: 8px; }
+  .toc a { display: block; border: none; margin: 3px 0; color: var(--ink2); font-size: 14.5px; }
+  .toc a:hover { color: var(--accent2); }
+  @media (max-width: 640px) { h1 { font-size: 26px; } .stat b { font-size: 20px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">Orthrus · 双头犬</div>
+  <h1>一条狗，两个脑</h1>
+  <p class="sub">在一台 MacBook 上从零实现四足机器人的三种控制范式，<br>
+  用同一套测试套件量化对决，最后融合它们——94% 推力恢复率的完整实录。</p>
+  <div class="stats">
+    <div class="stat"><b>94%</b><span>混合控制器推力恢复率</span></div>
+    <div class="stat"><b>72</b><span>决赛试验（8 方向×3 档×2 工况）</span></div>
+    <div class="stat"><b>0</b><span>GPU（全程 CPU 训练）</span></div>
+    <div class="stat"><b>10</b><span>天，从"能跑吗"到发布</span></div>
+  </div>
+  <p style="margin-top:22px; font-size:14.5px; color:var(--ink2)">
+    代码全部开源：<a href="https://github.com/weiwei-gu/Orthrus">github.com/weiwei-gu/Orthrus</a>
+  </p>
+</header>
+
+<nav class="toc">
+  <b>目录</b>
+  <a href="#s0">0 · 起点：一台 MacBook 引出的三个问题</a>
+  <a href="#s1">1 · Convex MPC：三天，八只虫</a>
+  <a href="#s2">2 · 把"能跑"变成"有多少分"：推力测试套件</a>
+  <a href="#s3">3 · RL 从零开始：40M 步学不会走路</a>
+  <a href="#s4">4 · 学生赢了老师：行为克隆引导</a>
+  <a href="#s5">5 · 温柔精调与 sim2sim 漂移</a>
+  <a href="#s6">6 · Orthrus：融合夺冠</a>
+  <a href="#s7">7 · 域随机化：补上最后一块拼图</a>
+  <a href="#s8">8 · 技术要点清单（可复用的经验）</a>
+  <a href="#s9">9 · 诚实的局限</a>
+  <a href="#s10">10 · 复现指南与文件地图</a>
+</nav>
+
+<h2 id="s0"><span class="no">0</span>起点：一台 MacBook 引出的三个问题</h2>
+<p class="lead">这个项目始于一个朴素的好奇：宇树的四足机器人 Go2 到底是怎么"站得住、走得稳、被踹不倒"的？以及——没有 NVIDIA GPU、只有一台 MacBook 的人，能从零走到哪一步？</p>
+<p>调研给出了两个流行答案：<b>MPC 路线</b>（MIT Mini Cheetah 血统的 convex MPC + WBC，宇树出厂固件用的就是它）和 <b>RL 路线</b>（Isaac Lab 上 PPO + 域随机化，那些刷屏的跑酷视频用的就是它）。于是我给项目定了三个递进的问题：</p>
+<ol>
+  <li>能不能<b>从零</b>实现一个 convex MPC，让仿真里的 Go2 站立、小跑、行走？</li>
+  <li>两种路线到底谁强？——不吵架，用<b>同一套测试</b>量化对表。</li>
+  <li>能不能把两者的长处<b>融合</b>起来？</li>
+</ol>
+<p>硬件：Apple M5 Pro / 48GB 内存，MuJoCo 物理仿真 42 万步/秒，MJX（JAX 版 MuJoCo）CPU 批量训练约 4,700 步/秒——所有训练、测试、演示全程无 GPU。</p>
+
+<h2 id="s1"><span class="no">1</span>Convex MPC：三天，八只虫</h2>
+<p class="lead">第一站是经典的 MIT Cheetah 风格 convex MPC（Di Carlo et al., ICRA 2018）：把机器人简化成单刚体，100Hz 解一个滚动时域的二次规划（QP）求四足接触力，500Hz 把力映射成关节力矩，摆动腿走预设轨迹。</p>
+<div class="ascii">
+指令脚本 ──▶ 100 Hz convex MPC (OSQP, 0.3s 时域) ──▶ 四足期望接触力
+                    ▲ 单刚体模型                        │
+           Raibert 落脚点 + trot 步态调度                ▼
+           sin³ 摆动轨迹 + 逆运动学        500 Hz 低层: τ = −Jᵀ·f + 重力补偿</div>
+<p>架构图三行写完，真正的故事在调试里。这个阶段最有价值的产出不是能跑的控制器，而是下面这张<b>昆虫图鉴</b>——八个真实的 bug，每一个都值得 robotics 入门者记住：</p>
+<table>
+  <tr><th>#</th><th>症状</th><th>真相</th></tr>
+  <tr><td>1</td><td>站立时垂直力只有体重的 40%</td><td>预测矩阵 off-by-one：<code>Apow[k-1-j]</code> 在 k=0 时变成 Python 负索引 <code>Apow[-1]</code>，悄悄取了 A^N</td></tr>
+  <tr><td>2</td><td>机器人直接瘫软塌下去</td><td>支撑力矩符号写反：虚功推导三遍才确认应为 <code>τ = −Jᵀ·f</code>（"压足"方向），写成 + 号等于帮地面把腿收起来</td></tr>
+  <tr><td>3</td><td>一开局 0.14 秒内被弹飞</td><td>模型的 home keyframe 足端嵌入地板 1.8cm，近刚性接触把机器人当炮弹发射</td></tr>
+  <tr><td>4</td><td>小跑必侧翻，摆动腿误差 54mm</td><td>落脚点参考点用错：髋关节锚点 y=±0.047，但腿实际悬挂在大腿 y=±0.142——落脚内收 9.5cm，四条腿在机身下交叉</td></tr>
+  <tr><td>5</td><td>每次触地机身被踹起 10cm</td><td>摆动 z 剖面用 sin(πs)：触地瞬间的垂直速度恰好是峰值 1.26 m/s——我写代码命令摆动足高速砸向地面</td></tr>
+  <tr><td>6</td><td>B 组腿周期末尾乱踩</td><td>步态窗口没设上界，摆动进度外插到 s=1.25，目标点被规划到地面以下 1.8cm</td></tr>
+  <tr><td>7</td><td>机身周期性下沉</td><td>sin² 剖面端点加速度峰值 ~4g：摆动腿弹射的反作用力把机身踹沉（SRB 模型没建模它）</td></tr>
+  <tr><td>8</td><td>支撑足滑出 14cm</td><td>MPC 用 μ=0.6 贴着摩擦锥边缘做姿态修正，实现误差一超界就打滑——留余量降到 0.35</td></tr>
+</table>
+<p>修完之后：站立阶段 roll/pitch 误差 &lt;0.2°，原地对角小跑高度稳定，0.5 m/s 前进 8 秒不摔。一个纯 CPU、2 倍实时、全部自己写的 MPC 栈——这是后面一切的地基。</p>
+
+<h2 id="s2"><span class="no">2</span>把"能跑"变成"有多少分"：推力测试套件</h2>
+<p class="lead">"能走"和"工业级"之间隔着什么？隔着的是可量化的抗扰动能力。这一章做的是件朴素但被多数业余项目跳过的事：写一个<b>推力恢复测试套件</b>，然后让所有控制器来考试。</p>
+<p>套件设计：对机身施加 0.1 秒脉冲力，冲量三档 10/20/30 N·s（相当于轻推、中踢、重踹），8 个方向，trot（原地小跑）和 walk（0.5 m/s 行走）两种工况，共 72 个试验。判定标准只有一条硬规则：<b>不摔 + 结束时姿态恢复</b>。附赠对照组（无推力必须 100% 通过，防误报）。</p>
+<p>第一次考试，MPC 的成绩单很骨感：</p>
+<table>
+  <tr><th>工况</th><th>10 N·s</th><th>20 N·s</th><th>30 N·s</th><th>总计</th></tr>
+  <tr><td>trot</td><td>44%</td><td>12%</td><td>6%</td><td rowspan="2"><b>18%</b></td></tr>
+  <tr><td>walk</td><td>25%</td><td>12%</td><td>0%</td></tr>
+</table>
+<p>失败模式分析揭示了一个教科书结论：失败全部是"真摔倒"，方向均匀分布——不是 bug，是<b>系统性恢复权限不足</b>。Raibert 1986 年就写过答案：腿式机器人被推后主要靠<b>迈步接住</b>（capture stepping），不是靠力微调。把落脚点速度增益从 0.05 提到 0.18（向外倒就往外跨）、给 MPC 加水平位置权重后，恢复率从 18% 涨到 <b>40%</b>，行走速度跟踪也从 84% 修正到 100%。</p>
+<div class="callout"><b>同样值得记录的是失败：</b>随后尝试的四个增强——0.5 秒更长 MPC 视野、摆动中落点重规划、倾角捕获步、角速度提前触发——在测试里全部显示<b>零收益甚至负收益</b>（最长的一个让行走工况恢复率从 62% 崩到 0%），全部回退。启发式补丁的天花板摸到了：40%。负结果全部留在代码注释和仓库里。</div>
+
+<h2 id="s3"><span class="no">3</span>RL 从零开始：40M 步学不会走路</h2>
+<p class="lead">MPC 到 40% 之后，路线 B 上场：不用任何模型和规划，让 PPO 在 MJX 里从零学会走路，并且天生抗踹（训练时随机推它）。</p>
+<p>环境完全对标 legged_gym 配方：45 维本体感知观察（无全局真值）、12 维关节位置目标、速度跟踪+姿态+存活奖励、随机速度冲量推力（与上面 N·s 同标度）。512 个并行环境，CPU 4,700 步/秒。</p>
+<p>结果是一个深刻的失败：40M 步训练，策略的回合长度从 2 涨到 800，但<b>始终学不会产生净位移</b>。诊断数据一目了然——观察它站立时的奖励构成：</p>
+<ul>
+  <li>站着不动：姿态、高度、存活奖励全部拿满，约 <b>1.5/步</b>，零风险</li>
+  <li>迈步走路：多拿 25% 速度奖励，但每一步都有摔倒风险（摔一跤 −5）</li>
+</ul>
+<p><b>"站着"是近最优解</b>。指令课程（只给前进指令）、收紧速度奖励核、加大每次更新的数据量——全都只产出"高质量的原地踏步"：动作幅度活跃、满幅摆动、周期对称——前后冲量相消，净位移为零。这不是超参数问题，是探索结构问题：PPO 要发现"时间上不对称的迈步"必须先摔无数跤，而摔跤在这个奖励结构里是纯亏本生意。</p>
+<div class="callout"><b>这不是我的独有发现，而是行业的集体经验</b>——所以主流训练栈要么给超大的并行采样量硬怼（Isaac Lab 4096 环境），要么用课程/示范引导。我的 CPU 算力只有人家的零头，硬怼这条路在 MacBook 上走不通。</div>
+
+<h2 id="s4"><span class="no">4</span>学生赢了老师：行为克隆引导</h2>
+<p class="lead">破局思路来自一个朴素观察：我们不是<b>已经有一个会走路的控制器吗</b>？让 MPC 当老师，把它的关节目标序列蒸馏进神经网络——这正是 Guided Policy Search（2013）的古老智慧。</p>
+<p>用 MPC 跑 12 个回合，采集 13,190 个（观察→动作）对。但行为克隆连着静默失败了三次，每个陷阱都值得单独讲：</p>
+<table>
+  <tr><th>陷阱</th><th>症状</th><th>原理与修法</th></tr>
+  <tr><td>① 观察里没有时钟</td><td>克隆精度极高，但机器人只站不动</td><td>周期性步态目标没有相位信号时，MSE 的最优解是<b>相位平均 = 静止姿态</b>。修法：观察里加 sin/cos 步态时钟（45→47 维）</td></tr>
+  <tr><td>② 示范相位与部署时钟错位</td><td>腿在微颤但不成步态</td><td>MPC 的步态相位与部署时钟有随机相对偏移，网络学不到"时钟↔摆腿"的确定映射。修法：采集时把 MPC 步态相位锁定到部署时钟</td></tr>
+  <tr><td>③ 示范动作超出网络可达域</td><td>大摆幅动作永远学不会</td><td>MPC 摆幅 ±1.5 超出 tanh 分布的 ±1 可达域，网络物理上无法输出。修法：动作钳位到 ±1，动作尺度 0.25→0.4</td></tr>
+</table>
+<p>三个坑填完，MSE 收敛到 0.00042，sim2sim 里腿真正小跑起来。然后出现了本项目<b>最意外的结果</b>：把这个纯克隆策略直接拉去推力考试——</p>
+<table>
+  <tr><th>工况</th><th>10 N·s</th><th>20 N·s</th><th>30 N·s</th><th>总计</th></tr>
+  <tr><td>MPC（老师）</td><td>88% / 62%</td><td>44% / 0%</td><td>12% / 13%</td><td><b>40%</b></td></tr>
+  <tr class="hl"><td>BC 克隆（学生）</td><td>88% / 88%</td><td>56% / 75%</td><td>25% / 38%</td><td><b>60%</b></td></tr>
+</table>
+<p><b>只上了一节课的学生，在考试里赢了老师</b>，而且赢的恰好是老师最弱的格（行走中被 20 N·s 踢：0% → 75%）。为什么克隆比原版更强？三个结构性原因：</p>
+<ul>
+  <li><b>网络的平滑性 vs 启发式的脆弱性</b>：MPC 的恢复靠一堆阈值触发的补丁规则，推力打乱时序就崩；网络是连续光滑映射，天生容忍状态偏移</li>
+  <li><b>时钟驱动的节奏不死</b>：被推后时钟继续走，步态节奏不断；MPC 的步态相位会被扰动打乱</li>
+  <li><b>被动柔顺</b>：位置伺服本身就是柔顺控制器，吸收冲击</li>
+</ul>
+<p>这个结果验证了工业界转向 RL 的核心逻辑：不是 RL 更聪明，是它的归纳偏置天然适合接触丰富动力学。交互演示里这个策略连挨 43 脚随机踢踹（12~20 N·s），43/43 全部恢复。</p>
+
+<h2 id="s5"><span class="no">5</span>温柔精调与 sim2sim 漂移</h2>
+<p class="lead">BC 学生留下一个明显短板：指令 +0.5 m/s，它实际净速度 −0.06（原地踏步型选手）。PPO 精调本该修好它，但第一轮精调把步态全毁了。诊断出三剂毒药后，第二轮温柔配方保住了步态——却撞上了一堵更深的墙。</p>
+<p>毒药与解药一一对应：entropy 奖励 2e-3→<b>1e-4</b>（不再把克隆策略重新噪声化）、学习率 2e-4→<b>5e-5</b>（小步慢走）、价值网络用示范回报<b>预训练</b>（替代随机初始化，PPO 的优势估计从第一步就靠谱）。这轮精调 18M 步全程无塌陷，速度第一次转正——然后是边界清晰的坏消息：</p>
+<table>
+  <tr><th>训练步数</th><th>MJX 评估奖励</th><th>MuJoCo 实测</th></tr>
+  <tr><td>0（BC 起点）</td><td>1103</td><td>✅ 走，净速 −0.06 m/s</td></tr>
+  <tr><td>11.8M（峰值）</td><td>1604</td><td>✅ 走，净速 <b>+0.14 m/s</b>（全程最佳）</td></tr>
+  <tr><td>13.8M / 15.7M</td><td>1523 / 1440</td><td>⚠️ 走，净速倒退到 −0.14 / −0.20</td></tr>
+  <tr><td>18M（最终）</td><td>1330</td><td>❌ 4 秒内翻倒</td></tr>
+  <tr><td>阶段 3/4 最终（+推力训练）</td><td>950~1080</td><td>❌ 全部躺平</td></tr>
+</table>
+<p><b>sim2sim 漂移</b>：MJX 的评估曲线全程好看，MuJoCo 的迁移性却从 11.8M 起单调退化。策略越训越贴 MJX 特有的接触/摩擦细节——而我们训练时<b>物理参数全是定值</b>，策略当然可以放心过拟合单一物理。这不是训练配方问题，是<b>训练分布问题</b>。甜点快照（11.8M）拿去考试：恢复率 51%——速度买了点，抗扰卖了些，两头不靠。</p>
+<div class="callout"><b>教训：</b>RL 线此时的状态是"半个答案"——BC 基线强在抗扰、弱在速度；精调买了速度、丢了迁移。破局的东西业界早就写好了配方：<b>域随机化</b>（第 7 章）。</div>
+
+<h2 id="s6"><span class="no">6</span>Orthrus：融合夺冠</h2>
+<p class="lead">至此三方各持一角：MPC 赢速度（0.5 m/s、跟踪 100%）、BC 赢抗扰（60%）、精调版两头不靠（51%）。把它们的长处拼起来的机会出现了——这就是 Orthrus（希腊神话的双头犬）：MPC 是理性脑，RL 是反射脑，仲裁器决定每个瞬间谁在开车。</p>
+<h3>设计要点（每个都有对应的失败教训）</h3>
+<ul>
+  <li><b>接口统一</b>：RL 策略输出位置目标；MPC 的力矩经代数转换驱动同一组位置伺服：<code>q_des = q + (τ + kd·qd)/kp</code>——MPC 全栈一行不改</li>
+  <li><b>触发阈值全部高于 MPC 标称瞬态</b>：MPC 行走俯仰常态 5~12°，交棒线设 14°——否则误触发步态冻结反而摔（实测吃过这个亏）</li>
+  <li><b>指令斜坡滤波</b>：指令从 0 跳到 0.5 的加速期，速度偏差瞬时超阈值，会造成假交棒（也实测吃过）——仲裁器看的是按 0.8 m/s² 逼近的斜坡指令</li>
+  <li><b>退出判据是"脱离危机"而非"完美姿态"</b>：BC 的标称俯仰就有 5~12°，用 6° 当退出线永远接不回；改用"刹住车"（高度/倾角/滑移回稳持续 0.3s）就还政于 MPC，残余姿态交给它修</li>
+  <li><b>40ms 交叉淡化 + RL 全程影子运行</b>：两个控制器之间无跳变；接回时重锚步态相位/钉地点/位置参考</li>
+</ul>
+<h3>决赛</h3>
+<table>
+  <tr><th>工况 / 冲量</th><th>MPC</th><th>RL-BC</th><th>Orthrus 混合</th></tr>
+  <tr><td>trot 10 N·s</td><td>88%</td><td>88%</td><td><b>100%</b></td></tr>
+  <tr><td>trot 20 N·s</td><td>44%</td><td>56%</td><td><b>100%</b></td></tr>
+  <tr><td>trot 30 N·s</td><td>12%</td><td>25%</td><td><b>81%</b></td></tr>
+  <tr><td>walk 10 N·s</td><td>62%</td><td>88%</td><td><b>100%</b></td></tr>
+  <tr><td>walk 20 N·s</td><td>0%</td><td>75%</td><td><b>100%</b></td></tr>
+  <tr><td>walk 30 N·s</td><td>13%</td><td>38%</td><td><b>88%</b></td></tr>
+  <tr class="hl"><td>总恢复率</td><td>40%</td><td>60%</td><td><b>94%（68/72）</b></td></tr>
+</table>
+<p>三个层次的解读：</p>
+<ul>
+  <li><b>MPC 的死穴被拔掉</b>：walk@20 N·s 从 0% → 100%——那个让它两周修不出来的侧向推力，现在由 RL 的反射弧兜住</li>
+  <li><b>不只是并集，是支配</b>：混合在<b>每一个格子</b>都不输两个父母，好几格是双方都 &lt;90%、混合拿满 100%——MPC 力控吸收小扰动、RL 接住大扰动、接回后 MPC 清理残余姿态，三个环节互相补台</li>
+  <li><b>无代价</b>：平均恢复时间 0.66s（与单控制器持平），无扰动对照零误报</li>
+</ul>
+<p>剩余 4 个失败全部是 30 N·s 纯侧向（±90°）——支撑多边形最窄的方向，2 m/s 的侧向捕获点已超出工作空间边界，这是单步物理天花板，双方父母各自的 12% 和 25% 在这里被共同继承。</p>
+
+<h2 id="s7"><span class="no">7</span>域随机化：补上最后一块拼图</h2>
+<p class="lead">第 5 章的漂移问题有了明确的病根（物理参数定值 → 过拟合单一物理），药方就是训练时把物理参数本身随机掉——策略必须对任意摩擦/质量/电机强度都活下来，自然无法过拟合。</p>
+<p>实现加在 MJX 训练环境里，每回合 reset 抽样一次系数，step 内重建物理系统（brax 的 System 是 jax pytree，<code>replace</code> 即得）：</p>
+<pre><code>DR_FRICTION = (0.6, 1.4)   # 滑动摩擦 ×
+DR_MASS     = (0.85, 1.15)  # 各连杆质量 ×
+DR_DAMPING  = (0.7, 1.3)    # 关节阻尼 ×
+DR_MOTOR    = (0.7, 1.3)    # 位置伺服 kp/kd × (电机强度)
+
+sys_r = sys.replace(
+    geom_friction=sys.geom_friction.at[:, 0].multiply(dr["friction"]),
+    body_mass=sys.body_mass * dr["mass"],
+    dof_damping=sys.dof_damping * dr["damping"],
+    actuator_gainprm=sys.actuator_gainprm.at[:, 0].multiply(dr["motor"]), ...)</code></pre>
+<p>配合已有的初始状态随机化、观察噪声和速度冲量推力，RL 训练分布终于对齐了 legged_gym 的标准配方。带域随机化的精调链正在重训（阶段 2 学走 → 阶段 3 中推力 → 阶段 4 目标推力），<b>本页将在完成后更新决赛数据</b>：如果 sim2sim 漂移被关闭，推力训练的成果将第一次真正迁移到 MuJoCo——那是 RL 线从"半个答案"变成完整答案的时刻。</p>
+
+<h2 id="s8"><span class="no">8</span>技术要点清单（可复用的经验）</h2>
+<ul>
+  <li><b>BC 引导三要素</b>：周期性任务的观察必须有相位时钟（否则 MSE 最优解是相位平均=静止）；示范的相位要与部署时钟确定对应；示范动作必须落在网络可达域内（tanh ±1）</li>
+  <li><b>从零 PPO 发现不了步态</b>，因为"站着"是近最优解——要么大算力硬怼，要么找老师（你自己的经典控制器就是现成的老师）</li>
+  <li><b>温柔精调三剂药</b>：低 entropy（1e-4）+ 低学习率（5e-5）+ 价值网预训练——保护克隆策略不被 PPO 毁掉</li>
+  <li><b>物理域随机化是 sim2sim/sim2real 的地基</b>：没有它，训练曲线好看≠迁移性好</li>
+  <li><b>力矩→位置接口的代数转换</b>：让力控栈驱动位置伺服，一行公式，两个世界打通</li>
+  <li><b>仲裁器的所有阈值要高于标称瞬态</b>：先测量正常行走的姿态/速度包络，再设触发线；指令阶跃要用斜坡滤波排除</li>
+  <li><b>推力测试套件是照妖镜</b>：无扰动时的完美演示会掩盖一切短板——"没有指标就没有标准"</li>
+  <li><b>负结果要留档</b>：0.5s 视野、捕获步、角速度触发……全部被数据证伪并留在仓库里，防止未来重蹈</li>
+</ul>
+
+<h2 id="s9"><span class="no">9</span>诚实的局限</h2>
+<ul>
+  <li><b>30 N·s 纯侧向</b>：混合版剩余的 4 个失败，突破需要多步恢复规划，超出本项目的单步捕获架构</li>
+  <li><b>混合版行走 ~0.3 m/s</b>（MPC 单独 0.5）：MJX 版模型的足端更小，MPC 步态参数未针对性适配</li>
+  <li><b>全部是仿真</b>：没有真机、没有 IMU 噪声模型、状态直接用真值——离 sim2real 还有完整的一公里</li>
+  <li><b>算力边界</b>：CPU 4,700 步/秒训练，量级只有工业配方的零头——本项目所有"从零学"的失败都要在这个前提下理解</li>
+  <li><b>它不是创新</b>：MPC、RL、蒸馏、混合仲裁全是成熟技术的复现。这个仓库的独特价值是<b>小而全的对照实验 + 完整的失败记录</b>，面向学习者和爱好者，不与工业框架竞争</li>
+</ul>
+
+<h2 id="s10"><span class="no">10</span>复现指南与文件地图</h2>
+<pre><code>git clone https://github.com/weiwei-gu/Orthrus && cd Orthrus
+python3 -m venv .venv && .venv/bin/pip install mujoco "jax==0.9.2" mujoco-mjx brax osqp
+
+# 看冠军表演：MPC 牵狗走 → 被随机踹 → 机身变橙红 = RL 接管救场 → 变回原色继续走
+.venv/bin/mjpython show_go2_hybrid.py
+
+# 复现决赛（各 ~15 分钟）
+.venv/bin/python run_go2_hybrid.py --push                       # 混合：94%
+.venv/bin/python run_go2_mpc.py                                 # MPC 单独
+.venv/bin/python eval_go2_rl.py policies/bc_init.pkl --push    # RL 单独：60%
+
+# 重训 RL 脑（含域随机化，约 3 小时）
+bash run_gentle_finetune.sh</code></pre>
+<table>
+  <tr><th>文件</th><th>作用</th></tr>
+  <tr><td><code>convex_mpc.py</code></td><td>单刚体 convex MPC（12 维状态 QP，OSQP）</td></tr>
+  <tr><td><code>go2_utils.py</code></td><td>trot 调度 / sin³ 摆动轨迹 / Raibert 落脚点 / 腿部 IK</td></tr>
+  <tr><td><code>run_go2_mpc.py</code></td><td>MPC 主控制器（站立/trot/行走）</td></tr>
+  <tr><td><code>train_go2_rl.py</code></td><td>RL 训练（MJX + Brax PPO + 物理/推力域随机化）</td></tr>
+  <tr><td><code>collect_demos.py</code> / <code>bc_bootstrap.py</code></td><td>MPC 示范采集 → 行为克隆 + 价值网预训练（产出 RL 脑）</td></tr>
+  <tr><td><code>run_go2_hybrid.py</code></td><td>★ 混合控制器（MPC+RL 仲裁）+ 推力套件入口</td></tr>
+  <tr><td><code>test_push_recovery.py</code></td><td>推力恢复测试套件（三方共用的同一把尺子）</td></tr>
+  <tr><td><code>show_go2_*.py</code></td><td>三个交互演示（mpc / rl / hybrid）</td></tr>
+  <tr><td><code>results/</code></td><td>全部试验数据（json），负结果也在</td></tr>
+  <tr><td><code>docs/claude-history.txt</code></td><td>7,800 行完整开发会话记录——所有坑的原始现场</td></tr>
+</table>
+
+<footer>
+  <p><b>Orthrus</b>（俄耳托斯）：希腊神话的双头犬。一条狗，两个脑——MPC 管怎么走，RL 管摔了怎么办。</p>
+  <p style="margin-top:10px">技术栈致谢：MuJoCo / MJX / Brax（DeepMind 开源）· mujoco_menagerie（模型）·
+  Convex MPC 方法源自 Di Carlo et al. (ICRA 2018) / MIT Mini Cheetah · RL 配方对标 legged_gym / unitree_rl_gym ·
+  蒸馏思想源自 Guided Policy Search (Levine &amp; Koltun, 2013)。</p>
+  <p style="margin-top:10px">一台 MacBook，10 天业余时间，没有 GPU。<a href="https://github.com/weiwei-gu/Orthrus">代码在此</a>，欢迎 issue 与 PR。</p>
+</footer>
+
+</div>
+</body>
+</html>

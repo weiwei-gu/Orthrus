@@ -84,7 +84,7 @@ control/
 # ③ 其他演示
 .venv/bin/mjpython show_go2_mpc.py        # MPC 行走（最快，0.5 m/s 小跑）
 .venv/bin/mjpython show_go2_rl.py         # RL 版（默认 bc_init + 随机踹踢）
-.venv/bin/mjpython show_go2_rl.py policies/rl_policy_snap_s2_11796480.pkl --no-kicks  # 精调版纯行走
+.venv/bin/mjpython show_go2_rl.py policies/rl_walk_sweet_spot.pkl --no-kicks  # 精调版纯行走
 
 # ④ （可选）重新训练 RL 脑：MPC 示范 → BC → 温柔精调，CPU 约 3 小时
 bash run_gentle_finetune.sh
