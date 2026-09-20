@@ -2,8 +2,7 @@
 
 > 一条狗，两个脑：MPC 管"怎么走"，RL 管"摔了怎么办"。
 
-📖 **技术设计文档**：[动力学模型、数学控制器设计与验证工作流](https://weiwei-gu.github.io/Orthrus/) —— 全部公式与常数和代码逐项一致（SRB 动力学、QP 形式化、MDP/奖励、仲裁状态机、72 试验协议）。
-📚 **开发叙事版**：[从零到 94% 的实录（story）](https://weiwei-gu.github.io/Orthrus/story.html) —— 10 天全过程长文，含全部踩坑记录。
+📖 **技术设计文档**：[动力学模型、数学控制器设计与验证工作流](https://weiwei-gu.github.io/Orthrus/) —— 全部公式与常数和代码逐项一致（SRB 动力学、QP 形式化、MDP/奖励、仲裁状态机、72 试验协议）。开发全过程记录见 `docs/claude-history.txt`。
 
 🎬 **演示视频**（26 s）：[Orthrus 混合控制器实录](docs/demo.mp4) —— MPC 行走 → 被踹**变橙红**（RL 脑接管救援）→ 变回原色继续走，三脚 18/20/22 N·s 全部救回，零摔倒。由 `record_video.py` 离屏渲染录制，可复现。
 
@@ -74,7 +73,7 @@ control/
 ├── results/               试验数据（push_recovery_*.json / rl_train_log_*.json / dr_finetune_verdict.json）
 ├── archive/               调试脚本与已废弃训练链（留档）
 ├── TODO.md                后续实验方向（接触参数 DR / 部署归一化修复 / 多步侧向恢复 / 真机…）
-├── docs/                  技术设计文档（index.html）+ 开发叙事版（story.html）+ 会话历史（claude-history.txt）
+├── docs/                  技术设计文档（index.html，GitHub Pages 发布）+ 演示视频（demo.mp4）+ 会话历史（claude-history.txt）
 └── models/go2/            Go2 模型（vendor 自 mujoco_menagerie 的 unitree_go2，含本项目两个自建场景）
 ```
 

@@ -8,91 +8,100 @@
 <link rel="stylesheet" href="assets/katex/katex.min.css">
 <style>
   :root {
-    --ink: #1a1f28; --ink2: #4a5468; --line: #e3e7ee; --bg: #ffffff;
-    --accent: #d9642a; --accent2: #2a6cd9; --code-bg: #f5f7fa; --table-head: #f0f3f8;
+    --ink: #14181f; --ink2: #566070; --line: #dce1e8; --bg: #ffffff;
+    --accent: #175177; --code-bg: #f4f6f9; --table-head: #edf1f6;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
                  "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    color: var(--ink); background: var(--bg); line-height: 1.75; font-size: 16px;
+    color: var(--ink); background: var(--bg); line-height: 1.8; font-size: 15.5px;
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 48px 22px 80px; }
-  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 36px; margin-bottom: 40px; }
-  .kicker { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
-  h1 { font-size: 32px; line-height: 1.25; margin: 10px 0 14px; font-weight: 800; }
-  .sub { color: var(--ink2); font-size: 17px; }
-  .stats { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 26px; }
-  .stat { border: 1px solid var(--line); border-radius: 10px; padding: 12px 18px; min-width: 118px; }
-  .stat b { display: block; font-size: 22px; color: var(--accent); font-weight: 800; }
-  .stat span { color: var(--ink2); font-size: 13px; }
-  h2 { font-size: 24px; margin: 60px 0 16px; padding-top: 12px; font-weight: 800; }
-  h2 .no { color: var(--accent); margin-right: 8px; font-family: ui-monospace, monospace; }
-  h3 { font-size: 18px; margin: 30px 0 10px; }
-  h4 { font-size: 15.5px; margin: 20px 0 8px; color: var(--ink); }
-  p { margin: 12px 0; }
-  p.lead { font-size: 17px; color: var(--ink); }
-  ul, ol { padding-left: 24px; margin: 12px 0; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 56px 22px 90px; }
+  header.hero { border-bottom: 2px solid var(--ink); padding-bottom: 30px; margin-bottom: 44px; }
+  .docmeta { color: var(--ink2); font-weight: 600; font-size: 12.5px; letter-spacing: 1.6px; text-transform: uppercase; }
+  h1 { font-size: 30px; line-height: 1.3; margin: 12px 0; font-weight: 700; letter-spacing: 0.2px; }
+  .sub { color: var(--ink2); font-size: 16px; max-width: 660px; }
+  .metabar { margin-top: 18px; font-size: 13px; color: var(--ink2); }
+  .metabar span + span::before { content: "·"; margin: 0 8px; color: #aab3bf; }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+  .stat { border: 1px solid var(--line); border-radius: 6px; padding: 10px 16px; min-width: 132px; background: var(--code-bg); }
+  .stat b { display: block; font-size: 21px; color: var(--accent); font-weight: 700; }
+  .stat span { color: var(--ink2); font-size: 12.5px; }
+  h2 { font-size: 22px; margin: 56px 0 14px; padding-top: 14px; font-weight: 700; border-top: 1px solid var(--line); }
+  h2 .no { color: var(--accent); margin-right: 10px; font-family: ui-monospace, monospace; font-weight: 600; }
+  h3 { font-size: 17px; margin: 28px 0 10px; font-weight: 700; }
+  h4 { font-size: 15px; margin: 20px 0 8px; font-weight: 700; }
+  p { margin: 11px 0; }
+  p.lead { font-size: 16px; color: var(--ink); }
+  ul, ol { padding-left: 24px; margin: 11px 0; }
   li { margin: 6px 0; }
-  a { color: var(--accent2); text-decoration: none; border-bottom: 1px solid #c9d8f2; }
-  a:hover { border-bottom-color: var(--accent2); }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid #b9cadd; }
+  a:hover { border-bottom-color: var(--accent); }
   code {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em;
-    background: var(--code-bg); padding: 2px 6px; border-radius: 5px;
+    background: var(--code-bg); padding: 1px 6px; border-radius: 4px;
   }
   pre {
-    background: #10141c; color: #dbe4f0; padding: 18px 20px; border-radius: 10px;
-    overflow-x: auto; margin: 16px 0; font-size: 13.5px; line-height: 1.6;
+    background: #14181f; color: #d7dde6; padding: 18px 20px; border-radius: 6px;
+    overflow-x: auto; margin: 15px 0; font-size: 13px; line-height: 1.6;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   pre code { background: none; padding: 0; color: inherit; }
-  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px; }
   th, td { border: 1px solid var(--line); padding: 7px 11px; text-align: left; }
   th { background: var(--table-head); font-weight: 700; }
-  tr.hl td { background: #fdf3ec; font-weight: 700; }
+  tr.hl td { background: #eef4f9; font-weight: 700; }
   .callout {
-    border-left: 4px solid var(--accent); background: #fdf6f1; padding: 14px 18px;
-    border-radius: 0 10px 10px 0; margin: 18px 0; color: #51392a;
+    border-left: 3px solid var(--accent); background: #f3f7fa; padding: 13px 18px;
+    border-radius: 0 6px 6px 0; margin: 16px 0; color: #22303d;
   }
   .callout b { color: var(--accent); }
   .note {
-    border-left: 4px solid var(--accent2); background: #f0f5fd; padding: 12px 16px;
-    border-radius: 0 10px 10px 0; margin: 16px 0; font-size: 14.5px;
+    border-left: 3px solid #8a6d3b; background: #faf7f0; padding: 12px 16px;
+    border-radius: 0 6px 6px 0; margin: 15px 0; font-size: 14px; color: #3d3527;
   }
-  .note b { color: var(--accent2); }
+  .note b { color: #8a6d3b; }
   .ascii {
-    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
-    padding: 16px 18px; overflow-x: auto; font-family: ui-monospace, monospace;
-    font-size: 12.5px; line-height: 1.55; white-space: pre; margin: 16px 0;
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 15px 18px; overflow-x: auto; font-family: ui-monospace, monospace;
+    font-size: 12px; line-height: 1.55; white-space: pre; margin: 15px 0; color: var(--ink);
   }
-  footer { border-top: 1px solid var(--line); margin-top: 64px; padding-top: 24px; color: var(--ink2); font-size: 14px; }
-  .toc { border: 1px solid var(--line); border-radius: 10px; padding: 18px 26px; margin: 8px 0 40px; }
-  .toc b { display: block; margin-bottom: 8px; }
-  .toc a { display: block; border: none; margin: 3px 0; color: var(--ink2); font-size: 14.5px; }
-  .toc a:hover { color: var(--accent2); }
-  .katex-display { margin: 18px 0; overflow-x: auto; overflow-y: hidden; }
-  @media (max-width: 640px) { h1 { font-size: 25px; } .stat b { font-size: 19px; } }
+  .figcap { font-size: 13.5px; color: var(--ink2); margin: 14px 0 6px; }
+  .figcap b { color: var(--ink); }
+  video { display: block; }
+  footer { border-top: 1px solid var(--line); margin-top: 64px; padding-top: 22px; color: var(--ink2); font-size: 13px; }
+  footer p { margin: 8px 0; }
+  .toc { border: 1px solid var(--line); border-radius: 6px; padding: 16px 26px; margin: 8px 0 44px; background: var(--code-bg); }
+  .toc b { display: block; margin-bottom: 8px; font-size: 14px; }
+  .toc a { display: block; border: none; margin: 3px 0; color: var(--ink2); font-size: 14px; }
+  .toc a:hover { color: var(--accent); }
+  .katex-display { margin: 16px 0; overflow-x: auto; overflow-y: hidden; }
+  @media (max-width: 640px) { h1 { font-size: 24px; } .stat b { font-size: 18px; } }
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <header class="hero">
-  <div class="kicker">Orthrus · 技术设计文档</div>
-  <h1>四足机器人 Go2 的全栈控制：模型、推导与工作流</h1>
+  <div class="docmeta">Orthrus · Technical Design Document</div>
+  <h1>四足机器人 Go2 的全栈控制：动力学模型、数学控制器设计与验证</h1>
   <p class="sub">浮基动力学 → 单刚体化简 → Convex MPC 的二次规划构建 → RL 的 MDP 形式化与域随机化 →
-  MPC+RL 混合仲裁的状态机 —— 以及把它们全部置于同一把尺子下的验证协议。</p>
-  <div class="stats">
-    <div class="stat"><b>94%</b><span>混合控制器推力恢复率（72 试验）</span></div>
-    <div class="stat"><b>15.21 kg</b><span>全机质量（本文档全部常数程序化提取）</span></div>
-    <div class="stat"><b>3</b><span>控制器范式，同一套验证协议</span></div>
-    <div class="stat"><b>0</b><span>GPU（全程 CPU 训练与仿真）</span></div>
+  MPC+RL 混合仲裁的状态机 —— 以及把它们全部置于同一套推力恢复协议下的量化对比。</p>
+  <div class="metabar">
+    <span>Unitree Go2（MJCF，常数程序化提取）</span>
+    <span>MuJoCo 3.13 · MJX · Brax</span>
+    <span>修订 2026-09-20</span>
+    <span><a href="https://github.com/weiwei-gu/Orthrus">github.com/weiwei-gu/Orthrus</a></span>
   </div>
-  <p style="margin-top:22px; font-size:14.5px; color:var(--ink2)">
-    代码：<a href="https://github.com/weiwei-gu/Orthrus">github.com/weiwei-gu/Orthrus</a>
-    · 开发过程叙事版（踩坑与决策时间线）：<a href="story.html">story.html</a>
-  </p>
+  <div class="stats">
+    <div class="stat"><b>94%</b><span>混合控制器推力恢复率</span></div>
+    <div class="stat"><b>68/72</b><span>决赛通过试验数</span></div>
+    <div class="stat"><b>0.66 s</b><span>平均恢复时间</span></div>
+    <div class="stat"><b>0</b><span>GPU（全程 CPU）</span></div>
+  </div>
 </header>
 
 <nav class="toc">
@@ -154,9 +163,8 @@
                                     12 × 位置伺服  τ = k_p(q*−q) − k_d·q̇
                                     （k_p=50, k_d=0.5, §1.4）</div>
 <p>三种控制器（MPC、RL、混合）输出统一到<b>同一执行器接口</b>，因此可以被同一套推力协议（§5）逐格对表。</p>
-<p style="margin-top:18px"><b>演示视频</b>（26 s，<code>record_video.py</code> 离屏渲染，剧本可复现）：
-行走 → 被踹<b>变橙红</b>（仲裁器交棒 RL 救援，§4）→ 回色（MPC 接回继续走）。
-三脚 18/20/22 N·s 全部救回，零摔倒，共 6 次换脑决策：</p>
+<p class="figcap"><b>视频 1</b> · 混合控制器演示实录（26 s，<code>record_video.py</code> 离屏渲染，剧本可复现）。
+机身<b>橙红</b> = 仲裁器交棒 RL 救援（§4），原色 = MPC 行驶；三脚 18/20/22 N·s 全部救回，零摔倒，共 6 次换脑决策：</p>
 <video controls muted loop autoplay
   style="width:100%; border-radius:10px; border:1px solid var(--line);"
   src="demo.mp4"></video>
@@ -628,7 +636,7 @@ bash run_gentle_finetune.sh</code></pre>
   <tr><td><code>test_push_recovery.py</code></td><td>§5.1</td><td>72 试验协议（三方共用的尺子）</td></tr>
   <tr><td><code>results/*.json</code></td><td>§5</td><td>全部试验原始数据，负结果也在</td></tr>
   <tr><td><code>models/go2/</code></td><td>§1.4</td><td>vendor 的 MJCF（场景 ×3 + 完整模型）</td></tr>
-  <tr><td><code>docs/story.html</code></td><td>—</td><td>开发过程叙事版（踩坑时间线）</td></tr>
+  <tr><td><code>record_video.py</code></td><td>§0</td><td>演示视频离屏渲染录制（→ <code>docs/demo.mp4</code>，剧本可复现）</td></tr>
   <tr><td><code>docs/claude-history.txt</code></td><td>—</td><td>7,800 行完整开发会话记录</td></tr>
 </table>
 
@@ -636,11 +644,13 @@ bash run_gentle_finetune.sh</code></pre>
   <p><b>文档与代码一致性</b>：本文档全部常数（质量/惯量/增益/权重/阈值/维数）于 2026-09-20
   由脚本从代码与 MJCF 运行时提取，非人工誊抄；数学式逐项对照实现源码写成。
   方程渲染为自托管 KaTeX（无外网依赖）。</p>
-  <p style="margin-top:10px">方法学致谢：Convex MPC 源自 Di Carlo et al. (ICRA 2018) / MIT Mini Cheetah；
+  <p>方法学致谢：Convex MPC 源自 Di Carlo et al. (ICRA 2018) / MIT Mini Cheetah；
   落脚点启发式源自 Raibert (1986)；RL 配方对标 legged_gym / unitree_rl_gym；
   蒸馏思想源自 Guided Policy Search (Levine &amp; Koltun, 2013)；
   仿真栈 MuJoCo / MJX / Brax（DeepMind 开源），模型 mujoco_menagerie (unitree_go2)。</p>
-  <p style="margin-top:10px">一台 MacBook，无 GPU。<a href="https://github.com/weiwei-gu/Orthrus">代码在此</a>，欢迎 issue 与 PR。</p>
+  <p>© 2026 weiwei.gu · 本项目代码与文档以 <b>MIT License</b> 发布；
+  <code>models/go2/</code> 遵循 Unitree Robotics 原始许可（见该目录 LICENSE）。
+  <a href="https://github.com/weiwei-gu/Orthrus">github.com/weiwei-gu/Orthrus</a></p>
 </footer>
 
 </div>
