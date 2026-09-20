@@ -163,7 +163,8 @@
                                     12 × 位置伺服  τ = k_p(q*−q) − k_d·q̇
                                     （k_p=50, k_d=0.5, §1.4）</div>
 <p>三种控制器（MPC、RL、混合）输出统一到<b>同一执行器接口</b>，因此可以被同一套推力协议（§5）逐格对表。</p>
-<p class="figcap"><b>视频 1</b> · 混合控制器演示实录（26 s，<code>record_video.py</code> 离屏渲染，剧本可复现）。
+<p class="figcap"><b>视频 1</b> · 混合控制器演示实录（26 s，<code>record_video.py</code> 离屏渲染，剧本可复现；
+模型 Unitree Go2，mujoco_menagerie）。
 机身<b>橙红</b> = 仲裁器交棒 RL 救援（§4），原色 = MPC 行驶；三脚 18/20/22 N·s 全部救回，零摔倒，共 6 次换脑决策：</p>
 <video controls muted loop autoplay
   style="width:100%; border-radius:10px; border:1px solid var(--line);"
