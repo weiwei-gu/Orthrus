@@ -1,0 +1,35 @@
+MIT License
+
+Copyright (c) 2026 weiwei.gu
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+Third-party content notice
+
+The MIT License above applies to the project's own code and documentation
+(everything in this repository EXCEPT the directory models/go2/).
+
+models/go2/ contains the Unitree Go2 MJCF model vendored from
+mujoco_menagerie (https://github.com/google-deepmind/mujoco_menagerie).
+It is Copyright (c) 2016-2022 HangZhou YuShu TECHNOLOGY CO.,LTD.
+("Unitree Robotics") and is licensed under its original terms
+(BSD-style, see the full text in models/go2/LICENSE), which are retained
+as required by that license.

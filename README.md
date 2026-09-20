@@ -137,5 +137,11 @@ bash run_gentle_finetune.sh
 - 状态直接用仿真真值，无 IMU 噪声模型与状态估计器
 - 技能仅有运动控制：挥手/作揖等技能需另训（MPC+IK 脚本化或 RL 技能配方）
 
+## 许可
+
+- 本项目代码与文档：**MIT License**（见 [LICENSE](LICENSE)）
+- `models/go2/`：mujoco_menagerie 的 unitree_go2 模型，版权归 Unitree Robotics，
+  遵循其原始许可（见 [models/go2/LICENSE](models/go2/LICENSE)），MIT 不覆盖该目录
+
 ---
 *模型：Unitree Go2（mujoco_menagerie）· 仿真：MuJoCo 3.13 · 训练：JAX 0.9.2 + Brax 0.14 + MJX*
