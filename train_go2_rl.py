@@ -5,7 +5,8 @@
             + 关节角速度(12) + 上一动作(12)   —— 全本体感知, 无全局真值
   动作 (12): ctrl = 默认姿态 + 0.4·clip(a, ±1.5)    (位置执行器 kp=50/kd=0.5)
   奖励: 速度跟踪 + 高度 + 姿态 + 存活 − 动作/关节惩罚 − 终止罚
-  域随机化: 初始状态 + 观察噪声 + 速度冲量推力 (0~2 m/s ≈ 0~30 N·s, 核心!)
+  域随机化: 物理参数 (摩擦/质量/阻尼/电机增益, 每回合 reset 重抽样, 关闭行走段 sim2sim 漂移)
+          + 初始状态 + 观察噪声 + 速度冲量推力 (0~2 m/s ≈ 0~30 N·s, 核心!)
 
 用法:
   .venv/bin/python train_go2_rl.py --smoke     # 快速验证训练管线
@@ -30,7 +31,8 @@ from brax.training.agents.ppo import train as ppo
 SCENE = "models/go2/scene_mjx.xml"
 
 # ---- 环境/奖励超参 ----
-N_FRAMES = 4             # 0.005 × 4 = 0.02 s 策略周期 (50 Hz)
+N_FRAMES = 4             # 0.002 × 4 = 8 ms 策略周期 (训练 125 Hz;
+                         # MuJoCo 部署端 20 ms/50 Hz —— 时钟在观察内, 步态对频率不敏感, 见 TODO P1)
 ACTION_SCALE = 0.4
 CLOCK_T = 0.6            # 步态时钟周期 (与 MPC 演示的步态周期一致)
 CMD_X = (-0.3, 1.0)

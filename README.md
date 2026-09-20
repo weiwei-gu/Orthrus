@@ -65,10 +65,13 @@ control/
 ├── show_go2_rl.py         演示：RL 边走边挨踹 / 纯行走（镜头跟随）
 ├── show_go2_hybrid.py     演示：★ 混合控制器（机身变色 = 换脑）
 ├── run_gentle_finetune.sh RL 精调链（采集 → BC → 三阶段 PPO）
-├── policies/              全部策略 pkl（bc_init.pkl = RL 救援脑；bc_demos.pkl = 示范数据）
-├── results/               试验数据（push_recovery_*.json / rl_train_log_*.json / npz）
+├── policies/              核心策略 pkl（bc_init = RL 救援脑 60%；rl_walk_sweet_spot = 无DR甜点；
+│                         rl_walk_dr_fast = DR 最快步行者 13.76M/+0.17；bc_demos = 示范数据；
+│                         archive_20260920/ = 全部历史快照与死产物，本地留档不入库）
+├── results/               试验数据（push_recovery_*.json / rl_train_log_*.json / dr_finetune_verdict.json）
 ├── archive/               调试脚本与已废弃训练链（留档）
-├── docs/                  完整开发会话历史（claude-history.txt，7800 行）
+├── TODO.md                后续实验方向（接触参数 DR / 部署归一化修复 / 多步侧向恢复 / 真机…）
+├── docs/                  技术设计文档（index.html）+ 开发叙事版（story.html）+ 会话历史（claude-history.txt）
 └── models/go2/            Go2 模型（vendor 自 mujoco_menagerie 的 unitree_go2，含本项目两个自建场景）
 ```
 
@@ -88,7 +91,8 @@ control/
 # ③ 其他演示
 .venv/bin/mjpython show_go2_mpc.py        # MPC 行走（最快，0.5 m/s 小跑）
 .venv/bin/mjpython show_go2_rl.py         # RL 版（默认 bc_init + 随机踹踢）
-.venv/bin/mjpython show_go2_rl.py policies/rl_walk_sweet_spot.pkl --no-kicks  # 精调版纯行走
+.venv/bin/mjpython show_go2_rl.py policies/rl_walk_sweet_spot.pkl --no-kicks  # 无DR精调纯行走
+.venv/bin/mjpython show_go2_rl.py policies/rl_walk_dr_fast.pkl --no-kicks    # DR 最快步行者（+0.17 m/s）
 
 # ④ （可选）重新训练 RL 脑：MPC 示范 → BC → 温柔精调，CPU 约 3 小时
 bash run_gentle_finetune.sh

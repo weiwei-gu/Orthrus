@@ -1,7 +1,7 @@
 """Go2 convex MPC 主控制器
 
 控制架构 (MIT Cheetah 风格):
-  50 Hz   convex MPC   —— 单刚体模型滚动优化, 输出 4 足期望接触力 (world 系)
+  100 Hz  convex MPC   —— 单刚体模型滚动优化, 输出 4 足期望接触力 (world 系, 每 5×2ms 步重解)
   500 Hz  低层控制     —— 支撑腿 τ = Jᵀ·f ; 摆动腿 PD 跟踪 IK 关节轨迹
 
 测试脚本 (无窗口):

@@ -10,11 +10,13 @@ __pycache__/
 .codely-cli/
 .DS_Store
 
-# 机器人模型: 上游 mujoco_menagerie 仓库 (按 README 步骤 0 另行 clone;
-# 本项目自建场景在 scenes/, 不依赖该目录入库)
+# 机器人模型: 上游 mujoco_menagerie 仓库 (本地 clone 用;
+# 本项目已把 unitree_go2 完整 vendor 入库 models/go2/, 含自建场景, 不依赖该目录)
 mujoco_menagerie/
 
-# 策略产物 (~34MB 本地实验工件): 只跟踪快速开始所需的两个
-policies/*.pkl
+# 策略产物 (~60MB 本地实验工件): 只跟踪三个核心产物
+policies/**/*.pkl
 !policies/bc_init.pkl
 !policies/rl_walk_sweet_spot.pkl
+!policies/rl_walk_dr_fast.pkl
+policies/archive_20260920/
