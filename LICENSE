@@ -19,17 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
---------------------------------------------------------------------------------
-
-Third-party content notice
-
-The MIT License above applies to the project's own code and documentation
-(everything in this repository EXCEPT the directory models/go2/).
-
-models/go2/ contains the Unitree Go2 MJCF model vendored from
-mujoco_menagerie (https://github.com/google-deepmind/mujoco_menagerie).
-It is Copyright (c) 2016-2022 HangZhou YuShu TECHNOLOGY CO.,LTD.
-("Unitree Robotics") and is licensed under its original terms
-(BSD-style, see the full text in models/go2/LICENSE), which are retained
-as required by that license.
