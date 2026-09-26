@@ -12,6 +12,7 @@ Unitree Go2 四足机器人运动控制项目（MuJoCo 仿真，全程在一台 
 | 控制器 | 总恢复率 | 行走速度（指令 +0.5 m/s） |
 |---|---|---|
 | Convex MPC（MIT Cheetah 风格） | 40% (29/72) | +0.42~0.50 m/s |
+| NMPC（逐次凸化，`--nmpc`；E 运动学精度 64×+全旋转惯量+SCvx） | 40% (29/72) | +0.50 m/s |
 | RL 行为克隆（MPC 步态蒸馏，`bc_init`） | 60% (43/72) | -0.06 m/s |
 | RL 温柔精调（11.8M 甜点快照） | 51% (37/72) | +0.14 m/s |
 | RL 域随机化精调（DR 链 13.76M 甜点） | 35% (25/72) | **+0.17 m/s（项目最快）** |
@@ -53,6 +54,8 @@ Orthrus（俄耳托斯）是希腊神话中的**双头犬**。这个项目的最
 ```
 control/
 ├── convex_mpc.py          单刚体 convex MPC（12 维状态 QP，OSQP）
+├── nmpc.py                NMPC 变体（逐次凸化：E 精确运动学 + 全旋转惯量 + SCvx，消融开关）
+├── ablate_nmpc.py         NMPC 消融实验驱动（轨迹力臂/全旋转惯量单变量开关）
 ├── go2_utils.py           trot 步态调度 / sin³ 摆动轨迹 / Raibert 落脚点 / 腿部 IK
 ├── run_go2_mpc.py         MPC 主控制器（站立 / 原地 trot / 前进，500Hz 力矩）
 ├── train_go2_rl.py        RL 训练（MJX + Brax PPO，4 阶段指令/推力课程）
@@ -88,6 +91,8 @@ control/
 # ② 复现决赛数据（各 ~15 分钟）
 .venv/bin/python run_go2_hybrid.py --push                          # 混合: 94%
 .venv/bin/python run_go2_mpc.py                                    # MPC 单独 (行走 16s 测试)
+.venv/bin/python run_go2_mpc.py --nmpc                             # NMPC 变体 (逐次凸化)
+.venv/bin/python test_push_recovery.py --nmpc                      # NMPC 推力套件: 40%
 .venv/bin/python eval_go2_rl.py policies/bc_init.pkl --push       # RL 单独: 60%
 
 # ③ 其他演示
@@ -125,6 +130,11 @@ bash run_gentle_finetune.sh
   +0.17 m/s 创项目最快）。但**推力训练段（s3/s4）18 个检查点在 MuJoCo 仍全部趴地**，死法与无 DR 版
   一致——缺口在 MJX/MuJoCo 的**接触求解器差异**（solref/solimp 不在 DR 范围内），
   故 RL 救援脑最终仍采用纯 BC 的 `bc_init`。原始数据：`results/dr_finetune_verdict.json`
+- **模型保真度不是抗扰瓶颈（NMPC 消融判决）**：把 MPC 升级为逐次凸化 NMPC（欧拉运动学精确
+  化——同姿态下误差降 64 倍、全旋转惯量、SCvx 迭代），72 试验恢复率 40%→40% 纹丝不动；
+  瓶颈在单步捕获的工作空间与步态时序，不在模型精度。另一个入档负结果：力臂沿预测轨迹更新
+  （几何更真实）诱发 MPC 拖延病理——"未来修正更便宜"导致俯仰修正被逐结点推迟直至摔倒
+  （`nmpc.py` 文档 + `ablate_nmpc.py` 可复现）
 - **力矩→位置接口**：`q_des = q + (τ + kd·qd)/kp` 让 MPC 力控栈一行不改地驱动位置伺服
 - **仲裁阈值**全部高于 MPC 标称瞬态（行走俯仰 5~12° → 触发线 14°），
   救援退出判据用"脱离危机"而非"完美姿态"（bc_init 标称俯仰即有 5~12°）

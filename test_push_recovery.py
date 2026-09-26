@@ -106,13 +106,27 @@ def run_trial(model, cond, mag, angle, seed, no_push=False, ctrl_factory=Go2Cont
 
 
 def main():
-    out_path = sys.argv[1] if len(sys.argv) > 1 else "results/push_recovery_suite.json"
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("out", nargs="?", default=None, help="json 输出路径")
+    parser.add_argument("--nmpc", action="store_true",
+                        help="用逐次凸化 NMPC (nmpc.py) 替换凸 MPC (默认凸 MPC)")
+    args = parser.parse_args()
+
+    out_path = args.out or ("results/push_recovery_nmpc.json" if args.nmpc
+                            else "results/push_recovery_suite.json")
     model = mujoco.MjModel.from_xml_path(SCENE)
+    ctrl_factory = (lambda m, d: Go2Controller(m, d, use_nmpc=True)) \
+        if args.nmpc else Go2Controller
+    if args.nmpc:
+        print("===== NMPC (SCvx 逐次凸化) 推力恢复套件 =====", flush=True)
+
     trials = []
 
     # 对照组 (无推力, 应 100% 通过)
     for cond in CONDITIONS:
-        r = run_trial(model, cond, 0.0, 0.0, 99, no_push=True)
+        r = run_trial(model, cond, 0.0, 0.0, 99, no_push=True,
+                      ctrl_factory=ctrl_factory)
         r["angle_deg"] = -1
         trials.append(r)
         print(f"[对照/{cond}] pass={r['pass']}")
@@ -122,7 +136,8 @@ def main():
         for mag in MAGS:
             for angle in DIR_ANGLES:
                 for seed in SEEDS[cond]:
-                    r = run_trial(model, cond, mag, angle, seed)
+                    r = run_trial(model, cond, mag, angle, seed,
+                                  ctrl_factory=ctrl_factory)
                     trials.append(r)
                     total += 1
                     mark = "✓" if r["pass"] else f"✗ fall@{r['fall_t']:.1f}s" if r["fall_t"] else "✗ 未恢复"

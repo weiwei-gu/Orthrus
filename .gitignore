@@ -4,6 +4,7 @@ __pycache__/
 
 # 虚拟环境 (~2GB)
 .venv/
+.venv-metal/
 
 # 本地工具/会话目录
 .claude/

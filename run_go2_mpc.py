@@ -52,7 +52,7 @@ V_WALK = 0.5        # 前进速度指令
 
 
 class Go2Controller:
-    def __init__(self, model, data):
+    def __init__(self, model, data, use_nmpc=False):
         self.model = model
         self.data = data
 
@@ -99,11 +99,16 @@ class Go2Controller:
         # ---- 控制器组件 ----
         # μ=0.4 (真实摩擦 0.8): 留实现误差余量; f_max=130 给扰动恢复留爆发力
         # q_pos 水平权重 12: 推力位移后 MPC 主动拉回 (原 2 太弱, 恢复率低)
-        self.mpc = ConvexMPC(m_tot, self.I_diag, mu=0.4, f_max=130.0,
-                             horizon=MPC_H, dt=MPC_DT,
-                             q_rpy=(60.0, 120.0, 15.0),
-                             q_pos=(12.0, 12.0, 100.0),
-                             q_vel=(6.0, 6.0, 8.0))
+        mpc_args = dict(mu=0.4, f_max=130.0, horizon=MPC_H, dt=MPC_DT,
+                        q_rpy=(60.0, 120.0, 15.0),
+                        q_pos=(12.0, 12.0, 100.0),
+                        q_vel=(6.0, 6.0, 8.0))
+        if use_nmpc:
+            # NMPC (逐次凸化): 精确欧拉运动学/全旋转惯量/轨迹力臂, 见 nmpc.py
+            from nmpc import NMPC
+            self.mpc = NMPC(m_tot, self.I_diag, **mpc_args)
+        else:
+            self.mpc = ConvexMPC(m_tot, self.I_diag, **mpc_args)
         self.ik = Go2IK(model)
         self.gait = TrotGait(GAIT_PERIOD)
         self.gait_enabled = False
@@ -357,6 +362,12 @@ class Go2Controller:
 
 # ---------------------------------------------------------------------- #
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--nmpc", action="store_true",
+                        help="用逐次凸化 NMPC (nmpc.py) 替换凸 MPC")
+    args = parser.parse_args()
+
     model = mujoco.MjModel.from_xml_path(SCENE)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, 0)   # home 站立姿态
@@ -370,7 +381,8 @@ def main():
     data.qpos[2] += foot_r - foot_z
     mujoco.mj_forward(model, data)
 
-    ctrl = Go2Controller(model, data)
+    ctrl = Go2Controller(model, data, use_nmpc=args.nmpc)
+    print(f"求解器: {'NMPC (SCvx 逐次凸化)' if args.nmpc else 'Convex MPC (QP)'}")
     print(f"模型: 总质量 {ctrl.mass:.2f} kg, 复合惯量对角 {np.round(ctrl.I_diag, 5)}")
     print(f"时间轴: 0~{T_STAND}s 站立 | {T_STAND}~{T_TROT}s 原地trot | {T_TROT}~{T_END}s 前进 {V_WALK} m/s")
 
@@ -416,6 +428,12 @@ def main():
     print(f"roll: |max| {np.degrees(np.abs(log['roll'][walk]).max()):.1f}°, "
           f"pitch: |max| {np.degrees(np.abs(log['pitch'][walk]).max()):.1f}°")
     print(f"MPC 求解 {ctrl.mpc.solve_count} 次, 末次状态 {ctrl.mpc.last_status}")
+    if hasattr(ctrl.mpc, "solve_ms") and ctrl.mpc.solve_ms:
+        ms = np.array(ctrl.mpc.solve_ms) * 1e3
+        m = ctrl.mpc
+        print(f"NMPC 求解耗时: 均值 {ms.mean():.2f} ms / p95 {np.percentile(ms, 95):.2f} ms / "
+              f"最大 {ms.max():.2f} ms (100 Hz 预算 10 ms) | "
+              f"SCvx 接受 {m.accepted} / 阻尼 {m.damped} / 拒绝 {m.rejected}")
     np.savez("results/go2_mpc_log.npz", **log)
     print("曲线数据已存 results/go2_mpc_log.npz")
 
