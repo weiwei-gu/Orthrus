@@ -106,36 +106,13 @@ def run_trial(model, cond, mag, angle, seed, no_push=False, ctrl_factory=Go2Cont
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("out", nargs="?", default=None, help="json 输出路径")
-    parser.add_argument("--nmpc", action="store_true",
-                        help="用逐次凸化 NMPC (nmpc.py) 替换凸 MPC (默认凸 MPC)")
-    parser.add_argument("--dob", action="store_true",
-                        help="启用质心动量扰动观测器前馈 (与 --nmpc 可组合)")
-    parser.add_argument("--cp", action="store_true",
-                        help="启用捕获点落脚重规划 (与 --nmpc/--dob 可组合)")
-    args = parser.parse_args()
-
-    suffix = ("_nmpc" if args.nmpc else "") + ("_dob" if args.dob else "") \
-        + ("_cp" if args.cp else "")
-    out_path = args.out or f"results/push_recovery{suffix or '_suite'}.json"
+    out_path = sys.argv[1] if len(sys.argv) > 1 else "results/push_recovery_suite.json"
     model = mujoco.MjModel.from_xml_path(SCENE)
-    if args.nmpc or args.dob or args.cp:
-        ctrl_factory = (lambda m, d: Go2Controller(m, d, use_nmpc=args.nmpc,
-                                                   use_dob=args.dob,
-                                                   use_cp=args.cp))
-    else:
-        ctrl_factory = Go2Controller
-    if suffix:
-        print(f"===== 推力恢复套件 ({suffix[1:]}) =====", flush=True)
-
     trials = []
 
     # 对照组 (无推力, 应 100% 通过)
     for cond in CONDITIONS:
-        r = run_trial(model, cond, 0.0, 0.0, 99, no_push=True,
-                      ctrl_factory=ctrl_factory)
+        r = run_trial(model, cond, 0.0, 0.0, 99, no_push=True)
         r["angle_deg"] = -1
         trials.append(r)
         print(f"[对照/{cond}] pass={r['pass']}")
@@ -145,8 +122,7 @@ def main():
         for mag in MAGS:
             for angle in DIR_ANGLES:
                 for seed in SEEDS[cond]:
-                    r = run_trial(model, cond, mag, angle, seed,
-                                  ctrl_factory=ctrl_factory)
+                    r = run_trial(model, cond, mag, angle, seed)
                     trials.append(r)
                     total += 1
                     mark = "✓" if r["pass"] else f"✗ fall@{r['fall_t']:.1f}s" if r["fall_t"] else "✗ 未恢复"

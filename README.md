@@ -12,13 +12,7 @@ Unitree Go2 四足机器人运动控制项目（MuJoCo 仿真，全程在一台 
 | 控制器 | 总恢复率 | 行走速度（指令 +0.5 m/s） |
 |---|---|---|
 | Convex MPC（MIT Cheetah 风格） | 40% (29/72) | +0.42~0.50 m/s |
-| NMPC（逐次凸化，`--nmpc`；E 运动学精度 64×+全旋转惯量+SCvx） | 40% (29/72) | +0.50 m/s |
-| MPC+DOB（质心动量扰动观测器前馈，`--dob`；负结果：窗口互斥） | 35% (25/72) | +0.50 m/s |
-| NMPC+DOB（SCvx 代价判据吸收 DOB 噪声，涌现交互但零净收益） | 40% (29/72) | +0.50 m/s |
-| MPC+CP（捕获点落脚重规划，`--cp`；负结果：位置捕获在髋参考步进里结构免费） | 24% (17/72) | — |
 | RL 行为克隆（MPC 步态蒸馏，`bc_init`） | 60% (43/72) | -0.06 m/s |
-| RL 温柔精调（11.8M 甜点快照） | 51% (37/72) | +0.14 m/s |
-| RL 域随机化精调（DR 链 13.76M 甜点） | 35% (25/72) | **+0.17 m/s（项目最快）** |
 | **Orthrus 混合（MPC 行走 + RL 救援）** | **94% (68/72)** | ~+0.3 m/s |
 
 推力 = 0.1s 脉冲冲量，10/20/30 N·s ≈ 轻推 / 中踢 / 重踹（8 方向 × 3 档 × trot/walk 两工况）。
@@ -57,9 +51,6 @@ Orthrus（俄耳托斯）是希腊神话中的**双头犬**。这个项目的最
 ```
 control/
 ├── convex_mpc.py          单刚体 convex MPC（12 维状态 QP，OSQP）
-├── nmpc.py                NMPC 变体（逐次凸化：E 精确运动学 + 全旋转惯量 + SCvx，消融开关）
-├── ablate_nmpc.py         NMPC 消融实验驱动（轨迹力臂/全旋转惯量单变量开关）
-├── dob_check.py           DOB 观测器单元验收（已知力注入/收敛/衰减判据）
 ├── go2_utils.py           trot 步态调度 / sin³ 摆动轨迹 / Raibert 落脚点 / 腿部 IK
 ├── run_go2_mpc.py         MPC 主控制器（站立 / 原地 trot / 前进，500Hz 力矩）
 ├── train_go2_rl.py        RL 训练（MJX + Brax PPO，4 阶段指令/推力课程）
@@ -74,12 +65,13 @@ control/
 ├── show_go2_hybrid.py     演示：★ 混合控制器（机身变色 = 换脑）
 ├── record_video.py        演示视频离屏渲染录制（→ docs/demo.mp4，可复现）
 ├── run_gentle_finetune.sh RL 精调链（采集 → BC → 三阶段 PPO）
-├── policies/              核心策略 pkl（bc_init = RL 救援脑 60%；rl_walk_sweet_spot = 无DR甜点；
-│                         rl_walk_dr_fast = DR 最快步行者 13.76M/+0.17；bc_demos = 示范数据；
-│                         archive_20260920/ = 全部历史快照与死产物，本地留档不入库）
-├── results/               试验数据（push_recovery_*.json / rl_train_log_*.json / dr_finetune_verdict.json）
-├── archive/               调试脚本与已废弃训练链（留档）
-├── TODO.md                后续实验方向（接触参数 DR / 部署归一化修复 / 多步侧向恢复 / 真机…）
+├── policies/              核心策略 pkl（bc_init = RL 救援脑 60%；bc_demos = 示范数据；
+│                         rl_walk_sweet_spot / rl_walk_dr_fast = 精调线步行者；
+│                         archive_20260920/ = 历史快照，本地留档不入库）
+├── results/               决赛数据（push_recovery_suite / push_recovery_hybrid）
+├── archive/               探索实验归档（NMPC/DOB/CP 消融代码与套件数据、DR 边界测绘、
+│                         jax-metal 判定、历史训练链）——负结果全部留档
+├── TODO.md                后续方向（sim2sim 接触缺口 / 部署归一化修复 / 多步侧向恢复 / 真机…）
 ├── docs/                  技术设计文档（index.html，GitHub Pages 发布）+ 演示视频（demo.mp4）+ 会话历史（claude-history.txt）
 └── models/go2/            Go2 模型（vendor 自 mujoco_menagerie 的 unitree_go2，含本项目两个自建场景）
 ```
@@ -95,15 +87,11 @@ control/
 # ② 复现决赛数据（各 ~15 分钟）
 .venv/bin/python run_go2_hybrid.py --push                          # 混合: 94%
 .venv/bin/python run_go2_mpc.py                                    # MPC 单独 (行走 16s 测试)
-.venv/bin/python run_go2_mpc.py --nmpc                             # NMPC 变体 (逐次凸化)
-.venv/bin/python test_push_recovery.py --nmpc                      # NMPC 推力套件: 40%
 .venv/bin/python eval_go2_rl.py policies/bc_init.pkl --push       # RL 单独: 60%
 
 # ③ 其他演示
 .venv/bin/mjpython show_go2_mpc.py        # MPC 行走（最快，0.5 m/s 小跑）
 .venv/bin/mjpython show_go2_rl.py         # RL 版（默认 bc_init + 随机踹踢）
-.venv/bin/mjpython show_go2_rl.py policies/rl_walk_sweet_spot.pkl --no-kicks  # 无DR精调纯行走
-.venv/bin/mjpython show_go2_rl.py policies/rl_walk_dr_fast.pkl --no-kicks    # DR 最快步行者（+0.17 m/s）
 
 # ④ （可选）重新训练 RL 脑：MPC 示范 → BC → 温柔精调，CPU 约 3 小时
 bash run_gentle_finetune.sh
@@ -133,20 +121,11 @@ bash run_gentle_finetune.sh
   加物理域随机化（摩擦/质量/阻尼/电机）后**行走段漂移被关闭**（9 个检查点全存活，13.76M 快照
   +0.17 m/s 创项目最快）。但**推力训练段（s3/s4）18 个检查点在 MuJoCo 仍全部趴地**，死法与无 DR 版
   一致——缺口在 MJX/MuJoCo 的**接触求解器差异**（solref/solimp 不在 DR 范围内），
-  故 RL 救援脑最终仍采用纯 BC 的 `bc_init`。原始数据：`results/dr_finetune_verdict.json`
-- **模型保真度不是抗扰瓶颈（NMPC 消融判决）**：把 MPC 升级为逐次凸化 NMPC（欧拉运动学精确
-  化——同姿态下误差降 64 倍、全旋转惯量、SCvx 迭代），72 试验恢复率 40%→40% 纹丝不动；
-  瓶颈在单步捕获的工作空间与步态时序，不在模型精度。另一个入档负结果：力臂沿预测轨迹更新
-  （几何更真实）诱发 MPC 拖延病理——"未来修正更便宜"导致俯仰修正被逐结点推迟直至摔倒
-  （`nmpc.py` 文档 + `ablate_nmpc.py` 可复现）
-- **捕获点理论的意外闭环（CP 负结果）**：当年调参 18%→40% 的 Raibert 增益 k=0.18 恰好等于捕获点
-  理论最优 1/ω=0.166——理论早已通过调参"到达"。理论完备版 CP 落脚重规划实测 24%（位置项量在
-  前馈锚点上，恢复期跟踪滞后被误判为扰动→大步后撤）；且位置捕获在髋参考步进里是结构免费的
-  （被推→com 位移→髋随体→脚落髋下=自动回正）。架构内增强方向至此穷尽，40%/94% 为实测硬墙
-- **扰动观测器的窗口互斥（DOB 负结果）**：质心动量观测器在站立/trot 本质精确（0.2/1.6N），
-  但 walk 段 40~100N 步态锁相噪声带在四种模型侧公式下全部存活——恰好覆盖 10 N·s 档力值（100N，
-  唯一可被 μ·mg≈60N 反力部分抵消的档位）→ 可检测的（20/30 N·s）抵消不了，可抵消的检测不到；
-  套件实测 35% vs 基线 40%，净伤害集中在门限边缘。无力传感的 SRB 观测器对推力恢复结构性无效
+  故 RL 救援脑最终仍采用纯 BC 的 `bc_init`。原始数据：`archive/results/dr_finetune_verdict.json`
+- **架构内增强已穷尽（战役归档）**：更高保真模型（NMPC 逐次凸化，40%）、质心动量扰动观测器
+  前馈（DOB，35%）、捕获点落脚重规划（CP，24%）在同一把尺子下全部无收益或负收益——
+  40%（MPC）/ 94%（混合）是当前架构的实测硬墙；调参后的 Raibert 捕获增益 k=0.18 ≈ 捕获点
+  理论最优 1/ω=0.166，负结果与消融数据全部见 `archive/`
 - **力矩→位置接口**：`q_des = q + (τ + kd·qd)/kp` 让 MPC 力控栈一行不改地驱动位置伺服
 - **仲裁阈值**全部高于 MPC 标称瞬态（行走俯仰 5~12° → 触发线 14°），
   救援退出判据用"脱离危机"而非"完美姿态"（bc_init 标称俯仰即有 5~12°）
