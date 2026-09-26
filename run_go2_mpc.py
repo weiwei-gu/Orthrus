@@ -52,10 +52,14 @@ QDD_MAX = 100.0     # 参考加速度限幅 (rad/s²)
 V_WALK = 0.5        # 前进速度指令
 DOB_GAIN = 80.0     # 质心动量观测器带宽 (1/s): ~12ms 收敛, 高于步态(~1.7Hz)低于噪声
 DOB_FEED_MIN = 100.0  # 前馈门限 (N): walk 段步态锁相噪声带 40~100N 之上才喂 QP
+CP_DEADBAND = 0.10    # 捕获点步死区 (m): DCM 相对参考偏差低于此不触发
+CP_V_GATE = 0.25      # 速度门 (m/s): 位置残差是噪声, 速度残差才是扰动签名
+CP_HALF_MAX = 0.26     # 捕获步侧向外侧限 (m, 距机身中线)
+CP_REACH = 0.28       # 捕获步总偏移限 (m, 距髋; 腿长-站立高度≈0.30, 留余量)
 
 
 class Go2Controller:
-    def __init__(self, model, data, use_nmpc=False, use_dob=False):
+    def __init__(self, model, data, use_nmpc=False, use_dob=False, use_cp=False):
         self.model = model
         self.data = data
 
@@ -130,6 +134,15 @@ class Go2Controller:
         self._fhat_peak = 0.0
         self._f_actual = np.zeros((4, 3))   # 低层回填: 站立腿真实足端力 (Jᵀ)⁻¹τ
 
+        # ---- 捕获点步 (capture point stepping) ----
+        # 每次起摆计算 DCM ξ = com + v/ω (ω=sqrt(g/z)); 偏离标称 Raibert
+        # 落点超死区则踩向捕获点 —— 一步踩不进工作空间就下一步继续追,
+        # 天然构成多步恢复 (Pratt 2006 capture point / Kajita DCM)。
+        # 与被证伪的旧倾角捕获步区别: 触发信号是速度发散 (CP 偏离) 而非
+        # 姿态瞬态, 且死区隔离标称行走的正常残差。
+        self.use_cp = bool(use_cp)
+        self.cp_fired = 0
+
         # ---- 运行时状态 ----
         self.step = 0
         self.forces = np.zeros((4, 3))
@@ -186,6 +199,25 @@ class Go2Controller:
             n = np.hypot(off[0], off[1])
             if n > 0.28:
                 land = hip_xy + off * (0.28 / n)
+        # ---- 捕获点步: 触发用 DCM 相对参考的偏差; 增量只补位置项 ----
+        # (速度项基线 Raibert k=0.18 已 ≈ 理论 1/ω=0.166, 双计会过冲; 首版
+        #  误用绝对差 ξ−标称落点, 原地 trot 恒触发收腿交叉侧翻 —— 已修)
+        if self.use_cp and hasattr(self, "p_cmd") \
+                and (d.time - getattr(self, "_cmd_change_t", -9.9)) > 1.5:
+            com = d.sensordata[self.adr_com:self.adr_com + 3]
+            omega_c = np.sqrt(9.81 / max(com[2], 0.15))
+            xi = com[:2] + v[:2] / omega_c
+            xi_ref = self.p_cmd[:2] + v_cmd[:2] / omega_c
+            dv = np.hypot(*(v[:2] - v_cmd[:2]))
+            if np.hypot(*(xi - xi_ref)) > CP_DEADBAND and dv > CP_V_GATE:
+                land = land + (com[:2] - self.p_cmd[:2])
+                self.cp_fired += 1
+                side = np.sign(hip_xy[1])       # 防交叉: 不许越过 0.06 内侧线
+                land[1] = side * np.clip(side * land[1], 0.06, CP_HALF_MAX)
+                off = land - hip_xy
+                n = np.hypot(off[0], off[1])
+                if n > CP_REACH:
+                    land = hip_xy + off * (CP_REACH / n)
         return land
 
     def _ref_derivs(self, foot, q_ref):
@@ -240,6 +272,7 @@ class Go2Controller:
         if np.any(v_cmd[:2] != self.v_cmd_prev[:2]):
             self.p_cmd = com[:2].copy()
             self.v_cmd_prev = v_cmd.copy()
+            self._cmd_change_t = t                 # CP 瞬态熄火窗计时起点
         self.p_cmd = self.p_cmd + v_cmd[:2] * DT
 
         # ---- 3. 步态推进 (含自适应恢复时序) ----
@@ -424,6 +457,8 @@ def main():
                         help="用逐次凸化 NMPC (nmpc.py) 替换凸 MPC")
     parser.add_argument("--dob", action="store_true",
                         help="启用质心动量扰动观测器前馈 (与 --nmpc 可组合)")
+    parser.add_argument("--cp", action="store_true",
+                        help="启用捕获点落脚重规划 (DCM 踩点, 多步恢复; 与其他旗标可组合)")
     args = parser.parse_args()
 
     model = mujoco.MjModel.from_xml_path(SCENE)
@@ -439,9 +474,11 @@ def main():
     data.qpos[2] += foot_r - foot_z
     mujoco.mj_forward(model, data)
 
-    ctrl = Go2Controller(model, data, use_nmpc=args.nmpc, use_dob=args.dob)
+    ctrl = Go2Controller(model, data, use_nmpc=args.nmpc, use_dob=args.dob,
+                        use_cp=args.cp)
     print(f"求解器: {'NMPC (SCvx 逐次凸化)' if args.nmpc else 'Convex MPC (QP)'}"
-          f"{' + DOB (质心动量观测器 K=80/s)' if args.dob else ''}")
+          f"{' + DOB (质心动量观测器 K=80/s)' if args.dob else ''}"
+          f"{' + CP (捕获点落脚重规划)' if args.cp else ''}")
     print(f"模型: 总质量 {ctrl.mass:.2f} kg, 复合惯量对角 {np.round(ctrl.I_diag, 5)}")
     print(f"时间轴: 0~{T_STAND}s 站立 | {T_STAND}~{T_TROT}s 原地trot | {T_TROT}~{T_END}s 前进 {V_WALK} m/s")
 
@@ -490,6 +527,8 @@ def main():
     if ctrl.use_dob:
         print(f"DOB 噪声底: 无推力全程 |f̂_xy| 峰值 {ctrl._fhat_peak:.1f} N"
               f" | 末值 f̂_xy = ({ctrl.f_ext_hat[0]:+.1f}, {ctrl.f_ext_hat[1]:+.1f}) N")
+    if ctrl.use_cp:
+        print(f"CP 捕获步: 全程触发 {ctrl.cp_fired} 次 (标称剧本应为小量)")
     if hasattr(ctrl.mpc, "solve_ms") and ctrl.mpc.solve_ms:
         ms = np.array(ctrl.mpc.solve_ms) * 1e3
         m = ctrl.mpc
