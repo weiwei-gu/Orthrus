@@ -120,7 +120,8 @@ class ConvexMPC:
         return l, u
 
     # ------------------------------------------------------------------ #
-    def solve(self, x0, yaw, com, feet_pos, stance_pred, x_ref):
+    def solve(self, x0, yaw, com, feet_pos, stance_pred, x_ref,
+              f_ext=None, tau_ext=None):
         """求当前时刻的足端力。
 
         参数:
@@ -130,6 +131,8 @@ class ConvexMPC:
           feet_pos:    (4,3) 足端位置 world (支撑足=当前位置, 摆动足=预计落点)
           stance_pred: (N,4) bool, knot k 时刻足 i 是否支撑
           x_ref:       (N,12) 参考状态轨迹
+          f_ext/tau_ext: (3,) 可选, 扰动观测器估计的外力/外力矩 (world 系),
+                        作为已知常值输入进入预测 (与接触力同路径, ω 行经 I_w⁻¹)
         返回:
           forces: (4,3) 第一段足端力 (world 系)
         """
@@ -154,6 +157,11 @@ class ConvexMPC:
 
         cvec = np.zeros(12)
         cvec[9:12] = dt * GRAVITY
+        # 扰动观测器前馈: 已知外力/外力矩作为常值输入 (与接触力同路径)
+        if f_ext is not None:
+            cvec[9:12] += dt * np.asarray(f_ext, dtype=float) / self.m
+        if tau_ext is not None:
+            cvec[6:9] += dt * (I_w_inv @ np.asarray(tau_ext, dtype=float))
 
         # ---- 预测矩阵: X = [x_1;...;x_N] = S x0 + G u + d ----
         Apow = [np.eye(12)]

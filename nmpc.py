@@ -93,6 +93,8 @@ class NMPC(ConvexMPC):
         self.lever_traj = bool(lever_traj)
         self.inertia_rot = bool(inertia_rot)
         self._u_warm = None
+        self._f_ext = np.zeros(3)      # 扰动观测器前馈 (solve 时更新, _f 消费)
+        self._tau_ext = np.zeros(3)
         # 统计 (诊断用)
         self.solve_ms = []
         self.accepted = 0
@@ -124,8 +126,8 @@ class NMPC(ConvexMPC):
         xnext = x.copy()
         xnext[0:3] = rpy + self.dt * (E @ w)
         xnext[3:6] = p + self.dt * v
-        xnext[6:9] = w + self.dt * (Iw_inv @ torque)
-        xnext[9:12] = v + self.dt * (GRAVITY + fsum / self.m)
+        xnext[6:9] = w + self.dt * (Iw_inv @ (torque + self._tau_ext))
+        xnext[9:12] = v + self.dt * (GRAVITY + (fsum + self._f_ext) / self.m)
         return xnext
 
     def _rollout(self, x0, U, feet_pos):
@@ -181,9 +183,14 @@ class NMPC(ConvexMPC):
         return S, G, d
 
     # ------------------------------------------------------------------ #
-    def solve(self, x0, yaw, com, feet_pos, stance_pred, x_ref):
-        """接口与 ConvexMPC.solve 完全一致 (yaw/com 被 E(·) 与轨迹力臂取代, 仅保留参数位)"""
+    def solve(self, x0, yaw, com, feet_pos, stance_pred, x_ref,
+              f_ext=None, tau_ext=None):
+        """接口与 ConvexMPC.solve 完全一致 (yaw/com 被 E(·) 与轨迹力臂取代, 仅保留参数位)。
+        f_ext/tau_ext: 扰动观测器估计 (world 系), 进非线性模型 —— 与重力同路径,
+        由缺陷偏移机制自动传播进 QP 的 d 项。"""
         t0 = time.perf_counter()
+        self._f_ext = np.asarray(f_ext, dtype=float) if f_ext is not None else np.zeros(3)
+        self._tau_ext = np.asarray(tau_ext, dtype=float) if tau_ext is not None else np.zeros(3)
         N, nu = self.N, 12
         x0 = np.asarray(x0, dtype=float)
         xr = np.asarray(x_ref, dtype=float).reshape(-1)

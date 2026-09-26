@@ -11,7 +11,8 @@ import sys
 import numpy as np
 import mujoco
 
-from convex_mpc import ConvexMPC
+from convex_mpc import ConvexMPC, GRAVITY
+from nmpc import rot_zyx
 from go2_utils import (FOOT_NAMES, TrotGait, swing_position, raibert_foothold,
                        quat_to_rpy, rot_z, Go2IK)
 
@@ -49,10 +50,12 @@ WBC_FF = 0.0        # 惯性前馈增益 (M·q̈_ref, 仅摆动腿) — A/B 测�
 QDD_EMA = 0.85      # 参考加速度 EMA 滤波系数 (重滤波压 IK 数值噪声)
 QDD_MAX = 100.0     # 参考加速度限幅 (rad/s²)
 V_WALK = 0.5        # 前进速度指令
+DOB_GAIN = 80.0     # 质心动量观测器带宽 (1/s): ~12ms 收敛, 高于步态(~1.7Hz)低于噪声
+DOB_FEED_MIN = 100.0  # 前馈门限 (N): walk 段步态锁相噪声带 40~100N 之上才喂 QP
 
 
 class Go2Controller:
-    def __init__(self, model, data, use_nmpc=False):
+    def __init__(self, model, data, use_nmpc=False, use_dob=False):
         self.model = model
         self.data = data
 
@@ -114,6 +117,18 @@ class Go2Controller:
         self.gait_enabled = False
         self.stand_until = T_STAND   # 此时刻前纯站立
         self.get_command = self._default_command
+
+        # ---- 扰动观测器 (质心动量观测器, 世界系, 无微分形式) ----
+        # ṗ = Σf_cmd + m·g + f_ext,  f̂ = K(p − p̂)
+        # Ḣ = Σ r×f_cmd + τ_ext,     τ̂ = K(H − Ĥ)
+        # 模型侧用 MPC 指令力 (低层 PD 修正/重力前馈的残余差被观测器吸收为"集总扰动")
+        self.use_dob = bool(use_dob)
+        self._p_hat = None
+        self._H_hat = None
+        self.f_ext_hat = np.zeros(3)
+        self.tau_ext_hat = np.zeros(3)
+        self._fhat_peak = 0.0
+        self._f_actual = np.zeros((4, 3))   # 低层回填: 站立腿真实足端力 (Jᵀ)⁻¹τ
 
         # ---- 运行时状态 ----
         self.step = 0
@@ -292,7 +307,36 @@ class Go2Controller:
                 self.planted[f] = foot_pos[i].copy()
             self._prev_swing[f] = is_swing
 
-        # ---- 4. convex MPC (50 Hz) ----
+        # ---- 3.5 扰动观测器 (500 Hz, 仅 use_dob) ----
+        # 模型侧用低层实际施加的足端接触力 (上一控制步回填), 而非 MPC 指令力 ——
+        # 指令力在落步瞬态与实际传递有滞后, 行走工况下会把 ~60N 的内力失配
+        # 误归为外扰 (实测噪声底: 站立 0.4N / trot 3.6N / walk 指令力版 62N 均值)
+        f_ext_hat = tau_ext_hat = None
+        if self.use_dob:
+            R = rot_zyx(rpy)
+            Iw = R @ np.diag(self.I_diag) @ R.T
+            p_mom = self.mass * v                      # 线动量 (world)
+            H_mom = Iw @ (R @ omega)                   # 角动量 (world)
+            if self._p_hat is None:                    # 首步初始化 (零扰动假设)
+                self._p_hat = p_mom.copy()
+                self._H_hat = H_mom.copy()
+            torque_cmd = np.zeros(3)
+            for i in range(4):
+                if stance[i]:
+                    torque_cmd += np.cross(foot_pos[i] - com, self._f_actual[i])
+            self.f_ext_hat = DOB_GAIN * (p_mom - self._p_hat)
+            self.tau_ext_hat = DOB_GAIN * (H_mom - self._H_hat)
+            self._p_hat += DT * (self._f_actual.sum(axis=0)
+                                 + self.mass * GRAVITY + self.f_ext_hat)
+            self._H_hat += DT * (torque_cmd + self.tau_ext_hat)
+            self._fhat_peak = max(self._fhat_peak, float(np.hypot(
+                self.f_ext_hat[0], self.f_ext_hat[1])))
+            # 前馈门限: 低于噪声带的估计不喂 QP (避免摩擦预算被幻影力浪费)
+            if np.hypot(self.f_ext_hat[0], self.f_ext_hat[1]) > DOB_FEED_MIN:
+                f_ext_hat = self.f_ext_hat
+                tau_ext_hat = self.tau_ext_hat
+
+        # ---- 4. convex MPC (100 Hz) ----
         if self.step % MPC_STEPS == 0:
             stance_pred = np.zeros((MPC_H, 4), dtype=bool)
             for k in range(MPC_H):
@@ -312,7 +356,8 @@ class Go2Controller:
                             p_ref[0], p_ref[1], Z_DES,
                             0.0, 0.0, 0.0,
                             v_cmd[0], v_cmd[1], 0.0]
-            self.forces = self.mpc.solve(x0, yaw, com, feet_pos, stance_pred, x_ref)
+            self.forces = self.mpc.solve(x0, yaw, com, feet_pos, stance_pred, x_ref,
+                                         f_ext=f_ext_hat, tau_ext=tau_ext_hat)
 
         # ---- 5. 低层: WBC 风格 ----
         # 支撑: -Jᵀ·f_MPC + 弱PD(钉地构型) + 重力补偿 + M·q̈ 惯性前馈
@@ -337,6 +382,15 @@ class Go2Controller:
                 tau_leg = (-(J.T @ self.forces[i])
                            + KP_STANCE * (q_ref - q) + KV_STANCE * (0.0 - qd)
                            + tau_grav)
+                if self.use_dob:
+                    # 回填真实足端力, 供观测器模型侧使用。完整关节动力学:
+                    #   Jᵀ·f_contact = M[腿行, :]·q̈ + qfrc_bias − τ_applied
+                    # (必须用质量矩阵整行 × 全部广义加速度 —— 浮基与腿的
+                    #  跨块惯量在行走中贡献 ~70N, 只取 3×3 对角块会漏掉)
+                    tau_applied = np.clip(tau_leg, self.ctrl_lo[aadr], self.ctrl_hi[aadr])
+                    dyn = (self._Mbuf[vadr, :] @ d.qacc
+                           + tau_grav - tau_applied)
+                    self._f_actual[i] = np.linalg.solve(J.T, dyn)
             else:
                 s = self.gait.swing_progress(f)
                 target = swing_position(self.liftoff[f], self.landing[f], s, SWING_HEIGHT)
@@ -352,6 +406,8 @@ class Go2Controller:
                     J_sw = self._jacp[:, vadr]
                     v_foot = self._jacp @ d.qvel
                     tau_leg += -J_sw.T @ (K_CART * v_foot)
+                if self.use_dob:
+                    self._f_actual[i] = 0.0
             for a in range(3):
                 tau[aadr[a]] = tau_leg[a]
 
@@ -366,6 +422,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--nmpc", action="store_true",
                         help="用逐次凸化 NMPC (nmpc.py) 替换凸 MPC")
+    parser.add_argument("--dob", action="store_true",
+                        help="启用质心动量扰动观测器前馈 (与 --nmpc 可组合)")
     args = parser.parse_args()
 
     model = mujoco.MjModel.from_xml_path(SCENE)
@@ -381,8 +439,9 @@ def main():
     data.qpos[2] += foot_r - foot_z
     mujoco.mj_forward(model, data)
 
-    ctrl = Go2Controller(model, data, use_nmpc=args.nmpc)
-    print(f"求解器: {'NMPC (SCvx 逐次凸化)' if args.nmpc else 'Convex MPC (QP)'}")
+    ctrl = Go2Controller(model, data, use_nmpc=args.nmpc, use_dob=args.dob)
+    print(f"求解器: {'NMPC (SCvx 逐次凸化)' if args.nmpc else 'Convex MPC (QP)'}"
+          f"{' + DOB (质心动量观测器 K=80/s)' if args.dob else ''}")
     print(f"模型: 总质量 {ctrl.mass:.2f} kg, 复合惯量对角 {np.round(ctrl.I_diag, 5)}")
     print(f"时间轴: 0~{T_STAND}s 站立 | {T_STAND}~{T_TROT}s 原地trot | {T_TROT}~{T_END}s 前进 {V_WALK} m/s")
 
@@ -428,6 +487,9 @@ def main():
     print(f"roll: |max| {np.degrees(np.abs(log['roll'][walk]).max()):.1f}°, "
           f"pitch: |max| {np.degrees(np.abs(log['pitch'][walk]).max()):.1f}°")
     print(f"MPC 求解 {ctrl.mpc.solve_count} 次, 末次状态 {ctrl.mpc.last_status}")
+    if ctrl.use_dob:
+        print(f"DOB 噪声底: 无推力全程 |f̂_xy| 峰值 {ctrl._fhat_peak:.1f} N"
+              f" | 末值 f̂_xy = ({ctrl.f_ext_hat[0]:+.1f}, {ctrl.f_ext_hat[1]:+.1f}) N")
     if hasattr(ctrl.mpc, "solve_ms") and ctrl.mpc.solve_ms:
         ms = np.array(ctrl.mpc.solve_ms) * 1e3
         m = ctrl.mpc

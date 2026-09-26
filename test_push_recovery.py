@@ -111,15 +111,20 @@ def main():
     parser.add_argument("out", nargs="?", default=None, help="json 输出路径")
     parser.add_argument("--nmpc", action="store_true",
                         help="用逐次凸化 NMPC (nmpc.py) 替换凸 MPC (默认凸 MPC)")
+    parser.add_argument("--dob", action="store_true",
+                        help="启用质心动量扰动观测器前馈 (与 --nmpc 可组合)")
     args = parser.parse_args()
 
-    out_path = args.out or ("results/push_recovery_nmpc.json" if args.nmpc
-                            else "results/push_recovery_suite.json")
+    suffix = ("_nmpc" if args.nmpc else "") + ("_dob" if args.dob else "")
+    out_path = args.out or f"results/push_recovery{suffix or '_suite'}.json"
     model = mujoco.MjModel.from_xml_path(SCENE)
-    ctrl_factory = (lambda m, d: Go2Controller(m, d, use_nmpc=True)) \
-        if args.nmpc else Go2Controller
-    if args.nmpc:
-        print("===== NMPC (SCvx 逐次凸化) 推力恢复套件 =====", flush=True)
+    if args.nmpc or args.dob:
+        ctrl_factory = (lambda m, d: Go2Controller(m, d, use_nmpc=args.nmpc,
+                                                   use_dob=args.dob))
+    else:
+        ctrl_factory = Go2Controller
+    if suffix:
+        print(f"===== 推力恢复套件 ({suffix[1:]}) =====", flush=True)
 
     trials = []
 
