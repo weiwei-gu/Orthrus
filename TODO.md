@@ -13,6 +13,8 @@
 
 ## P1 · 部署管线技术债（文档 §3.5 如实入档，实测可容忍但未修）
 
+- [ ] **Mac GPU 路线已实测排除**（`docs/jax-metal-verdict.md`）：jax-metal 缺 mhlo.cholesky kernel、
+      闭源无法自行维护——RL 训练的 GPU 加速**只剩云 CUDA**（RTX 4090 约 ¥2/h，DR 链 2h10m → 预计 10~20min）
 - [ ] **部署端补观察归一化**：`eval_go2_rl.py`/混合控制器构造网络时 preprocess 应为
       `rs.normalize`（当前恒等，喂原始观察；实测 raw/normalized 两路动作差 mean|Δa|≈0.17）。
       修复后**必须复测** bc_init 与混合的全套件——当前 60%/94% 都对应 raw 路径
